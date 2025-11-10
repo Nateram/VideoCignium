@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Detector de Movimiento en Punto Caliente - Análisis Inteligente{% endblock %}</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Handsontable CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@14.0.0/dist/handsontable.full.min.css">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar izquierdo (réplica exacta de la app desktop) -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Panel de Control</h2>
+            </div>
+            
+            <nav class="sidebar-content">
+                <!-- Sección Datos -->
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        DATOS
+                    </div>
+                    <button class="sidebar-btn" onclick="loadView('folders', event)">
+                        <span>📂</span>
+                        <span>Carpetas y Videos</span>
+                    </button>
+                </div>
+                
+                <!-- Sección Análisis -->
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        ANÁLISIS
+                    </div>
+                    <button class="sidebar-btn" onclick="loadView('select-folder', event)">
+                        <span>➕</span>
+                        <span>Seleccionar Carpeta</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="loadView('select-video', event)">
+                        <span>📹</span>
+                        <span>Seleccionar Video</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="loadView('process', event)" id="statusAnalysisBtn">
+                        <span id="statusAnalysisIcon">�</span>
+                        <span>Estado de Análisis</span>
+                        <span class="analysis-spinner" id="analysisSpinner" style="display: none;">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                        </span>
+                    </button>
+                    <button class="sidebar-btn" onclick="loadView('directo', event)">
+                        <span>📡</span>
+                        <span>Análisis en Directo</span>
+                    </button>
+                </div>
+                
+                <!-- Sección Configuración -->
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        CONFIGURACIÓN
+                    </div>
+                    <button class="sidebar-btn" onclick="loadView('roi-config', event)">
+                        <span>🕐</span>
+                        <span>Configurar Zona Hora</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="loadView('advanced', event)">
+                        <span>⚙️</span>
+                        <span>Configuración Avanzada</span>
+                    </button>
+                </div>
+                
+                <!-- Sección Información -->
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        INFORMACIÓN
+                    </div>
+                    <button class="sidebar-btn" onclick="loadView('excel', event)">
+                        <span>📊</span>
+                        <span>Excel</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="loadView('help', event)">
+                        <span>❓</span>
+                        <span>Ayuda</span>
+                    </button>
+                </div>
+
+                <!-- Sección Sesión -->
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        SESIÓN
+                    </div>
+                    <button class="sidebar-btn btn-danger" onclick="endSession()" title="Elimina todos los archivos y datos de la sesión actual">
+                        <span>🗑️</span>
+                        <span>Finalizar Sesión</span>
+                    </button>
+                </div>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <p>© 2025 Grupo de Ingeniería de Medios</p>
+                <p>Escuela Politécnica</p>
+            </div>
+        </aside>
+        
+        <!-- Área de contenido principal -->
+        <div class="content-area">
+            <!-- Barra superior -->
+            <div class="top-bar">
+                <h2 id="view-title">Detector de Movimiento IA</h2>
+                <div class="top-bar-actions">
+                    <button class="btn-top-bar" onclick="loadView('logs', event)" title="Ver logs del sistema">
+                        <i class="fas fa-file-alt"></i>
+                        Ver Logs
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Panel de contenido principal -->
+            <div class="main-panel" id="main-panel">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Config global (debe cargarse PRIMERO) -->
+    <script src="{{ url_for('static', filename='js/config.js') }}?v=20251107-50mb"></script>
+    <!-- Scripts de la aplicación -->
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20251107-50mb"></script>
+    <script src="{{ url_for('static', filename='js/directo.js') }}?v=20251107-50mb"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20251107-50mb"></script>
+    <!-- Handsontable JS -->
+    <script src="https://cdn.jsdelivr.net/npm/handsontable@14.0.0/dist/handsontable.full.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

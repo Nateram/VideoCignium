@@ -1,0 +1,623 @@
+// upload.js - Gestión de subida y procesamiento de videos
+// VERSIÓN: 20251107-chunks-50MB
+console.log('🔵 upload.js CARGADO - Versión: 20251107-chunks-50MB (Chunking con 50MB por fragmento)');
+
+let selectedFiles = [];
+let currentFolderId = null;
+
+// Verificar configuración ROI al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    // Esperar un poco para que los elementos del DOM estén listos
+    setTimeout(checkROIConfiguration, 500);
+});
+
+async function checkROIConfiguration() {
+    const isConfigured = localStorage.getItem('roiConfigured') === 'true';
+    
+    if (!isConfigured) {
+        // Mostrar advertencia en la página de upload
+        showROIWarning();
+    }
+    
+    // También verificar en el servidor
+    try {
+        const response = await fetch(buildApiUrl('/api/config/roi/get'));
+        const data = await response.json();
+        
+        if (!data.configured) {
+            showROIWarning();
+        } else {
+            // Si está configurado en servidor pero no en localStorage, sincronizar
+            localStorage.setItem('roiConfigured', 'true');
+            localStorage.setItem('roiConfig', JSON.stringify(data.roi));
+            
+            // Remover warning si existe
+            const existingWarning = document.getElementById('roiWarningBanner');
+            if (existingWarning) {
+                existingWarning.remove();
+            }
+        }
+    } catch (error) {
+        console.error('Error verificando configuración ROI:', error);
+    }
+}
+
+function showROIWarning() {
+    const uploadArea = document.getElementById('uploadArea');
+    if (!uploadArea) return;
+    
+    // Agregar banner de advertencia antes del área de upload
+    const warning = document.createElement('div');
+    warning.id = 'roiWarningBanner';
+    warning.className = 'roi-warning-banner';
+    warning.innerHTML = `
+        <div class="warning-content">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+                <strong>⚠️ Configuración Requerida</strong>
+                <p>Debes configurar la zona de hora antes de subir videos. Sin esta configuración, las fechas de los eventos serán incorrectas.</p>
+            </div>
+            <a href="#" onclick="loadView('roi-config'); return false;" class="btn btn-warning">
+                <i class="fas fa-cog"></i> Configurar Ahora
+            </a>
+        </div>
+    `;
+    
+    uploadArea.parentElement.insertBefore(warning, uploadArea);
+}
+
+// Elementos del DOM
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const fileListItems = document.getElementById('fileListItems');
+const uploadBtn = document.getElementById('uploadBtn');
+const uploadProgress = document.getElementById('uploadProgress');
+const uploadProgressBar = document.getElementById('uploadProgressBar');
+const uploadProgressText = document.getElementById('uploadProgressText');
+const roiSection = document.getElementById('roiSection');
+const startProcessingBtn = document.getElementById('startProcessingBtn');
+// Sección de procesamiento eliminada - no mostrar barra de progreso
+
+// Drag and drop events
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('drag-over');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('drag-over');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+});
+
+// File input change
+fileInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    handleFiles(files);
+});
+
+// Folder input change
+const folderInput = document.getElementById('folderInput');
+folderInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    handleFiles(files);
+});
+
+// Handle files
+function handleFiles(files) {
+    // Filtrar solo archivos de video permitidos
+    const videoFiles = files.filter(file => {
+        const ext = file.name.split('.').pop().toLowerCase();
+        return ['mp4', 'avi', 'mov', 'dav', 'mkv'].includes(ext);
+    });
+    
+    if (videoFiles.length === 0) {
+        showNotification('Por favor selecciona archivos de video válidos', 'warning');
+        return;
+    }
+    
+    selectedFiles = videoFiles;
+    displayFileList();
+}
+
+// Display file list
+function displayFileList() {
+    fileListItems.innerHTML = '';
+    
+    selectedFiles.forEach((file, index) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <i class="fas fa-file-video"></i>
+            <span>${file.name}</span>
+            <span style="margin-left: auto; color: #7F8C8D;">${formatFileSize(file.size)}</span>
+        `;
+        fileListItems.appendChild(li);
+    });
+    
+    fileList.style.display = 'block';
+    uploadArea.style.display = 'none';
+}
+
+// Upload button click
+uploadBtn.addEventListener('click', async () => {
+    console.log('🔵 BOTÓN DE SUBIDA CLICKEADO');
+    
+    if (selectedFiles.length === 0) {
+        console.log('⚠️ No hay archivos seleccionados');
+        showNotification('No hay archivos seleccionados', 'warning');
+        return;
+    }
+    
+    console.log('='.repeat(80));
+    console.log('🚀 INICIO DE PROCESO DE SUBIDA');
+    console.log('='.repeat(80));
+    console.log(`📊 Archivos seleccionados: ${selectedFiles.length}`);
+    
+    // Mostrar barra de progreso
+    uploadBtn.disabled = true;
+    uploadProgress.style.display = 'block';
+    uploadProgressBar.style.width = '0%';
+    uploadProgressText.textContent = 'Preparando archivos...';
+    
+    try {
+        // Subir archivos con chunking
+        // Primer chunk: 5MB (prueba de conexión)
+        // Resto de chunks: 20MB
+        const FIRST_CHUNK_SIZE = 5 * 1024 * 1024;  // 5MB para prueba
+        const CHUNK_SIZE = 20 * 1024 * 1024;       // 20MB para el resto
+        console.log(`📦 Tamaño primer chunk (prueba): ${FIRST_CHUNK_SIZE / (1024*1024)} MB`);
+        console.log(`📦 Tamaño resto chunks: ${CHUNK_SIZE / (1024*1024)} MB`);
+        
+        let totalSize = 0;
+        let uploadedSize = 0;
+        
+        // Calcular tamaño total y analizar fragmentación
+        console.log('\n' + '='.repeat(80));
+        console.log('📦 ANÁLISIS DE FRAGMENTACIÓN');
+        console.log('='.repeat(80));
+        console.log(`Tamaño de chunk: ${(CHUNK_SIZE / (1024 * 1024)).toFixed(2)} MB`);
+        
+        selectedFiles.forEach((file, index) => {
+            const chunks = Math.ceil(file.size / CHUNK_SIZE);
+            totalSize += file.size;
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            const lastChunkSize = file.size % CHUNK_SIZE;
+            const lastChunkMB = lastChunkSize > 0 ? (lastChunkSize / (1024 * 1024)).toFixed(2) : (CHUNK_SIZE / (1024 * 1024)).toFixed(2);
+            
+            console.log(`\n� Archivo ${index + 1}: ${file.name}`);
+            console.log(`   Tamaño: ${sizeMB} MB (${file.size} bytes)`);
+            console.log(`   Se dividirá en: ${chunks} fragmento(s)`);
+            if (chunks > 1) {
+                console.log(`   - Fragmentos 1-${chunks-1}: ${(CHUNK_SIZE / (1024 * 1024)).toFixed(2)} MB cada uno`);
+                console.log(`   - Fragmento ${chunks} (último): ${lastChunkMB} MB`);
+            }
+        });
+        
+        console.log(`\n📊 RESUMEN TOTAL:`);
+        console.log(`   Tamaño total: ${(totalSize / (1024 * 1024)).toFixed(2)} MB`);
+        console.log(`   Archivos: ${selectedFiles.length}`);
+        console.log('='.repeat(80));
+        
+        console.log('\n' + '='.repeat(80));
+        console.log('📡 PASO 1: CREAR SESIÓN DE SUBIDA');
+        console.log('='.repeat(80));
+        
+        const sessionUrl = buildApiUrl('/api/session/create');
+        console.log(`URL: ${sessionUrl}`);
+        console.log(`Método: POST`);
+        console.log(`Timestamp: ${new Date().toISOString()}`);
+        
+        console.log('⏳ Enviando petición de sesión...');
+        
+        const sessionResponse = await fetch(sessionUrl, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        }).catch(err => {
+            console.error('❌ ERROR DE RED EN CREACIÓN DE SESIÓN:', err);
+            throw err;
+        });
+        
+        console.log(`✅ Respuesta recibida:`);
+        console.log(`   Status: ${sessionResponse.status} ${sessionResponse.statusText}`);
+        
+        if (!sessionResponse.ok) {
+            const errorText = await sessionResponse.text();
+            console.error(`\n❌ ERROR HTTP al crear sesión:`);
+            console.error(`   Status: ${sessionResponse.status}`);
+            console.error(`   Respuesta: ${errorText}`);
+            throw new Error(`Error al crear sesión: ${sessionResponse.status} ${sessionResponse.statusText}`);
+        }
+        
+        const sessionData = await sessionResponse.json();
+        console.log(`\n✅ Sesión creada exitosamente:`);
+        console.log(`   Session ID: ${sessionData.session_id}`);
+        console.log(`   Session Folder: ${sessionData.session_folder}`);
+        
+        if (!sessionData.success) {
+            console.error(`\n❌ Error en respuesta de sesión:`, sessionData);
+            throw new Error('Error al crear sesión: ' + (sessionData.error || 'Desconocido'));
+        }
+        
+        const folderId = sessionData.session_id;
+        const uploadedFiles = [];
+        console.log('='.repeat(80));
+        
+        // Subir cada archivo en chunks
+        for (let fileIndex = 0; fileIndex < selectedFiles.length; fileIndex++) {
+            const file = selectedFiles[fileIndex];
+            
+            // Calcular chunks: primer chunk de 5MB, resto de 20MB
+            let totalChunks;
+            if (file.size <= FIRST_CHUNK_SIZE) {
+                totalChunks = 1;
+            } else {
+                totalChunks = 1 + Math.ceil((file.size - FIRST_CHUNK_SIZE) / CHUNK_SIZE);
+            }
+            
+            uploadProgressText.textContent = `Subiendo ${file.name} (${fileIndex + 1}/${selectedFiles.length})`;
+            console.log(`📤 [UPLOAD] Archivo ${fileIndex + 1}/${selectedFiles.length}: ${file.name}`);
+            console.log(`   Tamaño: ${(file.size / (1024*1024)).toFixed(2)}MB`);
+            console.log(`   Total chunks: ${totalChunks} (1er chunk: 5MB, resto: 20MB)`);
+            
+            let currentPosition = 0;
+            
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                // Primer chunk: 5MB, resto: 20MB
+                const currentChunkSize = (chunkIndex === 0) ? FIRST_CHUNK_SIZE : CHUNK_SIZE;
+                const start = currentPosition;
+                const end = Math.min(start + currentChunkSize, file.size);
+                const chunk = file.slice(start, end);
+                
+                currentPosition = end;
+                
+                const formData = new FormData();
+                formData.append('chunk', chunk);
+                formData.append('filename', file.name);
+                formData.append('chunkIndex', chunkIndex);
+                formData.append('totalChunks', totalChunks);
+                formData.append('folderId', folderId);
+                
+                if (chunkIndex === 0) {
+                    console.log(`🔍 [UPLOAD] Enviando PRIMER CHUNK (prueba de conexión) - ${(chunk.size / (1024*1024)).toFixed(2)}MB`);
+                } else {
+                    console.log(`📦 [UPLOAD] Enviando chunk ${chunkIndex + 1}/${totalChunks} - ${(chunk.size / (1024*1024)).toFixed(2)}MB`);
+                }
+                
+                // Subir chunk con timeout y retry
+                const chunkUrl = buildApiUrl('/api/upload/chunk');
+                console.log(`📡 [UPLOAD] URL chunk: ${chunkUrl}`);
+                console.log(`📤 [UPLOAD] FormData contiene: chunk=${chunk.size} bytes, filename=${file.name}, chunkIndex=${chunkIndex}, totalChunks=${totalChunks}, folderId=${folderId}`);
+                
+                let retries = 3;
+                let chunkResponse = null;
+                
+                while (retries > 0) {
+                    try {
+                        console.log(`🔄 [UPLOAD] Intento ${4-retries}/3 para chunk ${chunkIndex + 1}/${totalChunks}`);
+                        console.log(`⏰ [UPLOAD] Iniciando fetch a las ${new Date().toISOString()}`);
+                        
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => {
+                            console.error(`⏰ [UPLOAD] TIMEOUT! Abortando después de 5 minutos`);
+                            controller.abort();
+                        }, 300000); // 5 min timeout
+                        
+                        console.log(`📡 [UPLOAD] Llamando a fetch()...`);
+                        chunkResponse = await fetch(chunkUrl, {
+                            method: 'POST',
+                            body: formData,
+                            signal: controller.signal
+                        }).catch(netError => {
+                            console.error(`❌ [UPLOAD] ERROR DE RED CAPTURADO:`, netError);
+                            console.error(`❌ [UPLOAD] Tipo: ${netError.name}`);
+                            console.error(`❌ [UPLOAD] Mensaje: ${netError.message}`);
+                            throw netError;
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        console.log(`✅ [UPLOAD] Fetch completado a las ${new Date().toISOString()}`);
+                        console.log(`📡 [UPLOAD] Respuesta chunk - Status: ${chunkResponse.status} ${chunkResponse.statusText}`);
+                        
+                        if (!chunkResponse.ok) {
+                            const errorText = await chunkResponse.text();
+                            console.error(`❌ [UPLOAD] Error HTTP en chunk: ${chunkResponse.status}`, errorText);
+                            throw new Error(`Error HTTP: ${chunkResponse.status} ${chunkResponse.statusText}`);
+                        }
+                        
+                        break; // Éxito, salir del bucle de reintentos
+                        
+                    } catch (fetchError) {
+                        retries--;
+                        console.warn(`⚠️ [UPLOAD] Error en chunk ${chunkIndex + 1}/${totalChunks}, reintentos restantes: ${retries}`, fetchError);
+                        
+                        if (retries === 0) {
+                            console.error(`❌ [UPLOAD] Falló después de todos los reintentos:`, fetchError);
+                            throw new Error(`Error de conexión al subir chunk ${chunkIndex + 1}/${totalChunks}: ${fetchError.message}`);
+                        }
+                        
+                        // Esperar antes de reintentar
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                }
+                
+                if (!chunkResponse) {
+                    throw new Error(`No se pudo obtener respuesta para chunk ${chunkIndex + 1}/${totalChunks}`);
+                }
+                
+                const chunkData = await chunkResponse.json();
+                console.log(`✅ [UPLOAD] Chunk ${chunkIndex + 1}/${totalChunks} procesado:`, chunkData);
+                
+                // Si es el último chunk, guardar info del archivo
+                if (chunkData.complete) {
+                    console.log(`✅ [UPLOAD] Archivo completo ensamblado: ${file.name}`);
+                    console.log(`✅ [UPLOAD] Nombre sanitizado en servidor: ${chunkData.filename}`);
+                    uploadedFiles.push({
+                        name: chunkData.filename,  // Usar nombre sanitizado del servidor
+                        originalName: file.name,    // Guardar nombre original
+                        path: chunkData.filepath,
+                        is_duplicate: false
+                    });
+                }
+                
+                // Actualizar progreso
+                uploadedSize += (end - start);
+                const percentComplete = Math.round((uploadedSize / totalSize) * 100);
+                uploadProgressBar.style.width = percentComplete + '%';
+                uploadProgressText.textContent = `Subiendo ${file.name}: ${percentComplete}%`;
+                
+                if (chunkIndex % 5 === 0 || chunkData.complete) {
+                    console.log(`� [UPLOAD] Progreso: ${percentComplete}% (${(uploadedSize / (1024*1024)).toFixed(2)}MB / ${(totalSize / (1024*1024)).toFixed(2)}MB)`);
+                }
+            }
+            
+            console.log(`✅ [UPLOAD] Archivo ${fileIndex + 1}/${selectedFiles.length} completado: ${file.name}`);
+        }
+        
+        // Finalizar subida
+        uploadProgressBar.style.width = '100%';
+        uploadProgressText.textContent = 'Subida completa';
+        currentFolderId = folderId;
+        
+        console.log(`🎉 [UPLOAD] SUBIDA COMPLETA - ${uploadedFiles.length} archivos subidos`);
+        showNotification(`${uploadedFiles.length} video(s) subidos correctamente`, 'success');
+        
+        // Mostrar sección de ROI después de 1 segundo
+        setTimeout(() => {
+            uploadProgress.style.display = 'none';
+            fileList.style.display = 'none';
+            roiSection.style.display = 'block';
+            roiSection.scrollIntoView({ behavior: 'smooth' });
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ [UPLOAD] ERROR CRÍTICO:', error);
+        console.error('❌ [UPLOAD] Stack:', error.stack);
+        console.error('❌ [UPLOAD] Tipo de error:', error.name);
+        console.error('❌ [UPLOAD] Mensaje:', error.message);
+        
+        let errorMessage = 'Error al subir archivos';
+        
+        if (error.name === 'AbortError') {
+            errorMessage = 'Timeout: La subida tardó demasiado tiempo';
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            errorMessage = 'Error de conexión con el servidor. Verifica tu conexión de red.';
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
+        showNotification(errorMessage, 'error');
+        uploadBtn.disabled = false;
+        uploadProgress.style.display = 'none';
+    }
+});
+
+// Start processing button
+startProcessingBtn.addEventListener('click', async () => {
+    if (!currentFolderId) {
+        showNotification('No hay carpeta seleccionada', 'error');
+        return;
+    }
+    
+    // Obtener ROI
+    const roi = [
+        parseInt(document.getElementById('roiX').value) || 0,
+        parseInt(document.getElementById('roiY').value) || 0,
+        parseInt(document.getElementById('roiW').value) || 640,
+        parseInt(document.getElementById('roiH').value) || 480
+    ];
+    
+    // Iniciar procesamiento
+    startProcessingBtn.disabled = true;
+    roiSection.style.display = 'none';
+    // No mostrar barra de progreso - solo ver resultados en dashboard
+    
+    try {
+        const response = await fetch(buildApiUrl('/api/process'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                folder_id: currentFolderId,
+                roi: roi
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Procesamiento iniciado. Redirigiendo al estado de análisis...', 'success');
+            
+            // Redirigir inmediatamente a la vista de Estado de Análisis
+            // Agregar parámetro 'processing=starting' para indicar que acaba de empezar
+            setTimeout(() => {
+                window.location.href = '/?view=process&processing=starting';
+            }, 1000);
+        } else {
+            throw new Error(data.error || 'Error al iniciar procesamiento');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error al iniciar procesamiento: ' + error.message, 'error');
+        startProcessingBtn.disabled = false;
+        roiSection.style.display = 'block';
+    }
+});
+
+// Polling de estado del procesamiento
+let pollingInterval = null;
+
+function startStatusPolling() {
+    pollingInterval = setInterval(async () => {
+        try {
+            const response = await fetch(buildApiUrl('/api/processing-status'));
+            const status = await response.json();
+            
+            // Actualizar UI si es necesario (badge en sidebar)
+            if (window.updateProcessingBadge) {
+                window.updateProcessingBadge(status);
+            }
+            
+            if (!status.is_processing) {
+                clearInterval(pollingInterval);
+                onProcessingComplete();
+            }
+        } catch (error) {
+            console.error('Error al obtener estado:', error);
+        }
+    }, 1000); // Actualizar cada segundo
+}
+
+function onProcessingComplete() {
+    showNotification('¡Procesamiento completado! Redirigiendo al dashboard...', 'success');
+    
+    setTimeout(() => {
+        // Redirigir al dashboard y forzar recarga de datos
+        window.location.href = '/dashboard?reload=true';
+    }, 2000);
+}
+
+// Variables globales para sincronizar estado de checkboxes
+window.processingOptions = {
+    generateClips: true,
+    useAI: true
+};
+
+// Sincronizar checkboxes - guardar estado al cambiar
+function setupCheckboxSync() {
+    // Lista de todos los posibles checkboxes de "generar clips"
+    const clipsCheckboxIds = [
+        'generateClipsOption',           // Vista de upload
+        'folderGenerateClipsOption',     // Vista de folder
+        'videoGenerateClipsOption'       // Vista de video individual
+    ];
+    
+    // Lista de todos los posibles checkboxes de "usar IA"
+    const aiCheckboxIds = [
+        'useAiAnalysisOption',           // Vista de upload
+        'folderUseAiAnalysisOption',     // Vista de folder
+        'videoUseAiAnalysisOption'       // Vista de video individual
+    ];
+    
+    // Configurar listeners para checkboxes de clips
+    clipsCheckboxIds.forEach(id => {
+        const checkbox = document.getElementById(id);
+        if (checkbox) {
+            // Inicializar con el valor actual
+            window.processingOptions.generateClips = checkbox.checked;
+            console.log(`✅ Inicializado ${id}:`, checkbox.checked);
+            
+            checkbox.addEventListener('change', function() {
+                console.log(`🔄 Checkbox clips (${id}) cambió a:`, this.checked);
+                window.processingOptions.generateClips = this.checked;
+                
+                // Sincronizar con el checkbox de processing si existe
+                const processingCheckbox = document.getElementById('processingGenerateClips');
+                if (processingCheckbox) {
+                    processingCheckbox.checked = this.checked;
+                }
+                
+                // Sincronizar con todos los demás checkboxes de clips
+                clipsCheckboxIds.forEach(otherId => {
+                    if (otherId !== id) {
+                        const otherCheckbox = document.getElementById(otherId);
+                        if (otherCheckbox) {
+                            otherCheckbox.checked = this.checked;
+                        }
+                    }
+                });
+            });
+        }
+    });
+    
+    // Configurar listeners para checkboxes de IA
+    aiCheckboxIds.forEach(id => {
+        const checkbox = document.getElementById(id);
+        if (checkbox) {
+            // Inicializar con el valor actual
+            window.processingOptions.useAI = checkbox.checked;
+            console.log(`✅ Inicializado ${id}:`, checkbox.checked);
+            
+            checkbox.addEventListener('change', function() {
+                console.log(`🔄 Checkbox IA (${id}) cambió a:`, this.checked);
+                window.processingOptions.useAI = this.checked;
+                
+                // Sincronizar con el checkbox de processing si existe
+                const processingCheckbox = document.getElementById('processingUseAI');
+                if (processingCheckbox) {
+                    processingCheckbox.checked = this.checked;
+                }
+                
+                // Sincronizar con todos los demás checkboxes de IA
+                aiCheckboxIds.forEach(otherId => {
+                    if (otherId !== id) {
+                        const otherCheckbox = document.getElementById(otherId);
+                        if (otherCheckbox) {
+                            otherCheckbox.checked = this.checked;
+                        }
+                    }
+                });
+            });
+        }
+    });
+}
+
+// Resetear formulario al cargar la página
+window.addEventListener('load', () => {
+    selectedFiles = [];
+    currentFolderId = null;
+    setupCheckboxSync();
+});
+
+// Exportar función para uso global
+window.setupCheckboxSync = setupCheckboxSync;
+
+// Exportar función para aplicar valores cuando se crea la vista de ROI
+window.syncProcessingCheckboxes = function() {
+    console.log('🔄 Sincronizando checkboxes de ROI con valores:', window.processingOptions);
+    
+    const generateClipsProcessing = document.getElementById('processingGenerateClips');
+    const useAIProcessing = document.getElementById('processingUseAI');
+    
+    if (generateClipsProcessing) {
+        generateClipsProcessing.checked = window.processingOptions.generateClips;
+        console.log('✅ processingGenerateClips =', generateClipsProcessing.checked);
+    } else {
+        console.warn('⚠️ processingGenerateClips no encontrado');
+    }
+    
+    if (useAIProcessing) {
+        useAIProcessing.checked = window.processingOptions.useAI;
+        console.log('✅ processingUseAI =', useAIProcessing.checked);
+    } else {
+        console.warn('⚠️ processingUseAI no encontrado');
+    }
+};
+
+

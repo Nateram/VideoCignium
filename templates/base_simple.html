@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Detector de Movimiento en Punto Caliente - Análisis Inteligente{% endblock %}</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body style="background-color: #F8FAFC;">
+    <!-- Barra superior simple -->
+    <nav style="background: linear-gradient(135deg, #1E293B, #3B82F6); padding: 15px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;">
+        <div style="max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <h1 style="color: white; font-size: 1.5rem; margin: 0; font-weight: 600;">
+                    <i class="fas fa-brain" style="margin-right: 10px;"></i>
+                    Detector de Movimiento IA
+                </h1>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <a href="/" style="color: white; text-decoration: none; padding: 8px 16px; background: rgba(255,255,255,0.1); border-radius: 8px; transition: all 0.3s; display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
+                    <i class="fas fa-home"></i>
+                    Inicio
+                </a>
+                <button onclick="window.location.href='/'" style="color: white; background: rgba(255,255,255,0.1); border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
+                    <i class="fas fa-file-alt"></i>
+                    App Principal
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido principal -->
+    <div style="min-height: calc(100vh - 130px);">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer style="background: #1E293B; color: white; text-align: center; padding: 20px 0; margin-top: 40px;">
+        <div style="max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 30px;">
+            <p style="margin: 0; font-size: 0.9rem;">
+                © 2025 Grupo de Ingeniería de Medios - Escuela Politécnica
+            </p>
+            <p style="margin: 0; font-size: 0.9rem;">
+                ✨ Detección Automática • ⚡ Procesamiento Rápido
+            </p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Config global (debe cargarse PRIMERO) -->
+    <script src="{{ url_for('static', filename='js/config.js') }}?v=20251107-50mb"></script>
+    <!-- Scripts de la aplicación -->
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20251107-50mb"></script>
+    <script src="{{ url_for('static', filename='js/upload.js') }}?v=20251107-50mb"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

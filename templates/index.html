@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Detector de Movimiento en Punto Caliente - Análisis Inteligente{% endblock %}
+
+{% block content %}
+<!-- Pantalla de bienvenida (réplica exacta de la app de escritorio) -->
+<div class="container">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <h1 class="hero-title">
+            <i class="fas fa-brain"></i>
+            Detector de Movimiento con Inteligencia Artificial
+        </h1>
+        <p class="hero-subtitle">
+            Analiza videos de seguridad y detecta automáticamente eventos de movimiento con clasificación de objetos
+        </p>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-cloud-upload-alt"></i> Subir Videos para Análisis</h2>
+        </div>
+        <div class="card-body">
+            <div class="upload-options">
+                <p class="upload-description">
+                    Selecciona cómo quieres subir tus videos para el análisis de movimiento e inteligencia artificial.
+                </p>
+                <div class="upload-buttons-grid">
+                    <button class="btn-upload-option btn-folder" onclick="loadView('select-folder')">
+                        <i class="fas fa-folder-open"></i>
+                        <h3>Seleccionar Carpeta</h3>
+                        <p>Sube una carpeta completa con múltiples videos</p>
+                    </button>
+                    <button class="btn-upload-option btn-video" onclick="loadView('select-video')">
+                        <i class="fas fa-file-video"></i>
+                        <h3>Seleccionar Videos</h3>
+                        <p>Sube uno o más videos individuales</p>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROI Selection Section -->
+    <!-- ROI Selection Section removed from main page - handled in upload views -->
+
+    <!-- Processing Status -->
+    <!-- Features Section -->
+    <div class="features-grid">
+        <div class="feature-card">
+            <i class="fas fa-brain feature-icon"></i>
+            <h3>Detección Inteligente</h3>
+            <p>Usa YOLOv10 para clasificar objetos detectados en los clips</p>
+        </div>
+        <div class="feature-card">
+            <i class="fas fa-video-slash feature-icon"></i>
+            <h3>Análisis de Movimiento</h3>
+            <p>Detecta eventos de movimiento con precisión usando algoritmos avanzados</p>
+        </div>
+        <div class="feature-card">
+            <i class="fas fa-file-excel feature-icon"></i>
+            <h3>Reportes Excel</h3>
+            <p>Genera informes detallados en Excel con todos los eventos detectados</p>
+        </div>
+        <div class="feature-card">
+            <i class="fas fa-clock feature-icon"></i>
+            <h3>Clips Automáticos</h3>
+            <p>Crea clips de 16 segundos alrededor de cada evento detectado</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% endblock %}

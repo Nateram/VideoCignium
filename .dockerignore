@@ -1,0 +1,47 @@
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Archivos de logs
+logs/
+*.log
+
+# Archivos temporales
+temp/
+tmp/
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Archivos de build
+build/
+dist/
+*.egg-info/
+
+# Archivos de base de datos temporales (no incluir en imagen)
+*.db
+
+# Modelos grandes - COMENTADO para incluir el modelo YOLO en la imagen
+# yolov10n.pt
+
+# Documentación
+README.md
+*.md
+
+# Scripts de desarrollo
+docker-run.sh
+docker-run.bat
+
+# Archivos de configuración local
+.env
+.env.local
