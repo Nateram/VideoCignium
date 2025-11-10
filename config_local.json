@@ -1,0 +1,8 @@
+{
+  "app_mode": "local",
+  "data_folder": "datos_aplicacion",
+  "videos_folder": "videos",
+  "database_name": "detector_movimiento.db",
+  "loose_videos_folder": "Videos Sueltos",
+  "auto_create_folders": true
+}

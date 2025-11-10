@@ -1097,6 +1097,7 @@ def generate_roi_preview():
         logger.info(f"🎬 Generando preview para ROI (resolución original - solo primer frame): {video_filename}")
         
         # Generar preview: video de 1 frame en resolución original (compatible con navegador)
+
         ffmpeg_exe = video_processing.get_ffmpeg_path()
         
         cmd = [
@@ -3262,6 +3263,73 @@ def cleanup_all_on_exit():
     logger.info(f"✅ Limpieza completada: {cleaned_count} elementos eliminados")
     logger.info("👋 Servidor cerrado correctamente")
     logger.info("="*80)
+
+# ====================================================================
+# 🖥️ ENDPOINTS PARA MODO LOCAL (ELECTRON)
+# ====================================================================
+
+@app.route('/api/local/folders', methods=['GET'])
+def get_local_folders():
+    """Obtiene todas las carpetas de videos del almacenamiento local"""
+    try:
+        import local_storage
+        storage = local_storage.get_storage()
+        folders = storage.get_all_folders()
+        
+        return jsonify({
+            'success': True,
+            'folders': folders,
+            'base_path': storage.videos_folder
+        })
+    except Exception as e:
+        logger.error(f"Error al obtener carpetas locales: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/local/add-folder', methods=['POST'])
+def add_local_folder():
+    """Agrega una carpeta del sistema a la aplicación"""
+    try:
+        data = request.json
+        folder_path = data.get('path')
+        
+        if not folder_path:
+            return jsonify({'success': False, 'error': 'No se proporcionó ruta'}), 400
+        
+        import local_storage
+        storage = local_storage.get_storage()
+        folder_name, link_path = storage.add_folder_reference(folder_path)
+        
+        return jsonify({
+            'success': True,
+            'folder_name': folder_name,
+            'link_path': link_path
+        })
+    except Exception as e:
+        logger.error(f"Error al agregar carpeta: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/local/add-files', methods=['POST'])
+def add_local_files():
+    """Agrega archivos individuales a 'Videos Sueltos'"""
+    try:
+        data = request.json
+        file_paths = data.get('paths', [])
+        
+        if not file_paths:
+            return jsonify({'success': False, 'error': 'No se proporcionaron archivos'}), 400
+        
+        import local_storage
+        storage = local_storage.get_storage()
+        copied = storage.copy_files_to_loose(file_paths)
+        
+        return jsonify({
+            'success': True,
+            'copied_count': len(copied),
+            'files': copied
+        })
+    except Exception as e:
+        logger.error(f"Error al agregar archivos: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Registrar función de limpieza para cuando se cierre el servidor
