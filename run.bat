@@ -1,0 +1,3 @@
+@echo off
+echo Iniciando Detector de Movimiento...
+call npm start
