@@ -5,9 +5,11 @@ contextBridge.exposeInMainWorld('electron', {
   platform: process.platform,
   version: process.versions.electron,
   
-  // API para seleccionar carpetas
+  // API para seleccionar carpetas y archivos locales
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  selectFiles: () => ipcRenderer.invoke('select-files'),
+  getFolderInfo: (path) => ipcRenderer.invoke('get-folder-info', path),
   
-  // API para seleccionar archivos
-  selectFiles: () => ipcRenderer.invoke('select-files')
+  // Indicador de que estamos en Electron (no navegador)
+  isElectron: true
 });

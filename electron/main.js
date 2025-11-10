@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const kill = require('tree-kill');
+const fs = require('fs');
 
 let mainWindow;
 let flaskProcess;
@@ -25,7 +26,8 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      cache: false  // Desactivar caché
     },
     icon: path.join(__dirname, 'icon.png'),
     title: 'Detector de Movimiento',
@@ -37,17 +39,57 @@ function createWindow() {
     mainWindow.setMenuBarVisibility(false);
   }
 
+  // LIMPIAR TODO EL CACHÉ AL INICIAR
+  mainWindow.webContents.session.clearCache().then(() => {
+    console.log('✅ Caché de Electron limpiado');
+  });
+  
+  mainWindow.webContents.session.clearStorageData({
+    storages: ['appcache', 'cookies', 'filesystem', 'indexdb', 'localstorage', 'shadercache', 'websql', 'serviceworkers', 'cachestorage']
+  }).then(() => {
+    console.log('✅ Almacenamiento de Electron limpiado');
+  });
+
   // Cargar la aplicación Flask
   const loadApp = () => {
-    mainWindow.loadURL(`http://localhost:${FLASK_PORT}`)
+    mainWindow.loadURL(`http://localhost:${FLASK_PORT}`, {
+      extraHeaders: 'pragma: no-cache\n'
+    })
       .catch(err => {
         console.log('Esperando a Flask...', err.message);
         setTimeout(loadApp, 500);
       });
   };
 
-  // Esperar un poco para que Flask inicie
-  setTimeout(loadApp, 2000);
+  // Esperar un poco para que Flask inicie Y el caché se limpie
+  setTimeout(loadApp, 2500);
+
+  // Atajos de teclado para recargar (útil durante desarrollo)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    // F5 o Ctrl+R: recargar sin caché
+    if (input.key === 'F5' || (input.control && input.key === 'r')) {
+      event.preventDefault();
+      mainWindow.webContents.reloadIgnoringCache();
+    }
+    // Ctrl+Shift+R: hard reload
+    if (input.control && input.shift && input.key === 'R') {
+      event.preventDefault();
+      mainWindow.webContents.session.clearCache().then(() => {
+        mainWindow.webContents.reloadIgnoringCache();
+      });
+    }
+  });
+
+  mainWindow.on('close', async (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      isQuitting = true;
+      console.log('🛑 Cerrando ventana - deteniendo Flask...');
+      await stopFlask();
+      mainWindow.destroy();
+      app.quit();
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -217,35 +259,6 @@ function stopFlask() {
   });
 }
 
-// Handlers IPC para diálogos nativos
-ipcMain.handle('select-folder', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory'],
-    title: 'Seleccionar carpeta con videos'
-  });
-  
-  if (!result.canceled && result.filePaths.length > 0) {
-    return { success: true, path: result.filePaths[0] };
-  }
-  return { success: false };
-});
-
-ipcMain.handle('select-files', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile', 'multiSelections'],
-    title: 'Seleccionar videos',
-    filters: [
-      { name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'dav', 'mkv'] },
-      { name: 'Todos los archivos', extensions: ['*'] }
-    ]
-  });
-  
-  if (!result.canceled && result.filePaths.length > 0) {
-    return { success: true, paths: result.filePaths };
-  }
-  return { success: false };
-});
-
 // Evento cuando Electron está listo
 app.whenReady().then(async () => {
   try {
@@ -277,6 +290,71 @@ app.on('before-quit', async (event) => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+// ====================================================================
+// 🔥 IPC Handlers - Comunicación con el renderer
+// ====================================================================
+
+// Selector de carpeta nativo
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Seleccionar carpeta con videos'
+  });
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    return { 
+      success: true, 
+      path: result.filePaths[0],
+      name: path.basename(result.filePaths[0])
+    };
+  }
+  return { success: false };
+});
+
+// Selector de archivos múltiples
+ipcMain.handle('select-files', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile', 'multiSelections'],
+    title: 'Seleccionar videos',
+    filters: [
+      { name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'dav', 'mkv'] },
+      { name: 'Todos', extensions: ['*'] }
+    ]
+  });
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    return { 
+      success: true, 
+      files: result.filePaths  // Array simple de rutas
+    };
+  }
+  return { success: false };
+});
+
+// Obtener información de carpeta
+ipcMain.handle('get-folder-info', async (event, folderPath) => {
+  try {
+    const stats = fs.statSync(folderPath);
+    const files = fs.readdirSync(folderPath);
+    const videoExtensions = ['.mp4', '.avi', '.mov', '.dav', '.mkv'];
+    const videos = files.filter(f => {
+      const ext = path.extname(f).toLowerCase();
+      return videoExtensions.includes(ext);
+    });
+    
+    return {
+      success: true,
+      path: folderPath,
+      name: path.basename(folderPath),
+      totalFiles: files.length,
+      videoFiles: videos.length,
+      videos: videos
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
   }
 });
 
