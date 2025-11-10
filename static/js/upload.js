@@ -620,4 +620,68 @@ window.syncProcessingCheckboxes = function() {
     }
 };
 
+// ====================================================================
+// 🖥️ FUNCIONES PARA ELECTRON - Selección de carpetas locales
+// ====================================================================
+
+// Detectar si estamos en Electron
+window.isElectron = window.electron && window.electron.isElectron;
+
+// Función para seleccionar carpeta local (solo en Electron)
+window.selectLocalFolder = async function() {
+    if (!window.isElectron) {
+        alert('Esta función solo está disponible en la aplicación de escritorio');
+        return;
+    }
+    
+    try {
+        console.log('📁 Abriendo selector de carpeta...');
+        const result = await window.electron.selectFolder();
+        
+        if (!result.success || !result.path) {
+            console.log('❌ Selección cancelada');
+            return;
+        }
+        
+        console.log('✅ Carpeta seleccionada:', result.path);
+        
+        // Leer configuración guardada en lugar de preguntar
+        const config = JSON.parse(localStorage.getItem('advancedConfig') || '{"duplicateFiles":true}');
+        const duplicate = config.duplicateFiles !== false; // Por defecto true
+        
+        console.log(`📋 Usando configuración guardada: ${duplicate ? 'Duplicar archivos' : 'Analizar desde ruta original'}`);
+        
+        // Enviar carpeta al servidor
+        const response = await fetch(buildApiUrl('/api/select-local-folder'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                folder_path: result.path,
+                duplicate_files: duplicate
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('✅ Carpeta registrada:', data);
+            alert(`✅ Carpeta registrada exitosamente\n\nVideos encontrados: ${data.videos_found}\nModo: ${duplicate ? 'Duplicar archivos' : 'Analizar desde ruta original'}\n\n💡 Puedes cambiar esta preferencia en Configuración Avanzada`);
+            
+            // Actualizar currentFolderId para poder procesar
+            currentFolderId = data.folder_id;
+            
+            // Mostrar sección de ROI y procesamiento
+            if (roiSection) {
+                roiSection.style.display = 'block';
+            }
+        } else {
+            alert(`❌ Error: ${data.error}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error al seleccionar carpeta:', error);
+        alert(`❌ Error: ${error.message}`);
+    }
+};
+
 

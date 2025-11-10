@@ -88,6 +88,17 @@ app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'static', 'uploads')
 app.config['ALLOWED_EXTENSIONS'] = {'mp4', 'avi', 'mov', 'dav', 'mkv'}
 
 # ====================================================================
+# 📂 CONFIGURACIÓN MODO LOCAL (Sin sesiones - BD única)
+# ====================================================================
+app.config['DATA_FOLDER'] = os.path.join(BASE_DIR, 'data_local')
+app.config['DB_PATH'] = os.path.join(app.config['DATA_FOLDER'], 'detector_movimiento.db')
+app.config['CLIPS_FOLDER'] = os.path.join(app.config['DATA_FOLDER'], 'clips_analisis')
+
+# Crear carpetas
+os.makedirs(app.config['DATA_FOLDER'], exist_ok=True)
+os.makedirs(app.config['CLIPS_FOLDER'], exist_ok=True)
+
+# ====================================================================
 # 🎯 CONFIGURACIÓN DE CONCURRENCIA - ARQUITECTURA SECUENCIAL
 # ====================================================================
 # IMPORTANTE: Procesamiento SECUENCIAL de tareas (una carpeta a la vez)
@@ -103,39 +114,19 @@ log_folder = os.path.join(BASE_DIR, 'logs')
 os.makedirs(log_folder, exist_ok=True)
 
 def cleanup_old_logs():
-    """Limpia logs antiguos, manteniendo solo los 10 más recientes"""
+    """Verifica cuántos logs hay (la limpieza real se hace al cerrar la app)"""
     try:
-        # Obtener todos los archivos de log
+        # Solo contar archivos, no intentar eliminar (se eliminan al cerrar)
         log_files = [f for f in os.listdir(log_folder) if f.startswith('session_') and f.endswith('.log')]
+        log_count = len(log_files)
         
-        if len(log_files) <= 10:
-            logger.info(f"✅ No hay logs antiguos que limpiar ({len(log_files)} archivos)")
-            return
-        
-        # Obtener rutas completas y ordenar por fecha de modificación (más reciente primero)
-        log_paths = [os.path.join(log_folder, f) for f in log_files]
-        log_paths.sort(key=os.path.getmtime, reverse=True)
-        
-        # Mantener solo los 10 más recientes
-        files_to_keep = log_paths[:10]
-        files_to_delete = log_paths[10:]
-        
-        logger.info(f"🧹 Limpiando {len(files_to_delete)} logs antiguos, manteniendo {len(files_to_keep)} recientes")
-        
-        # Eliminar logs antiguos
-        deleted_count = 0
-        for old_log in files_to_delete:
-            try:
-                os.remove(old_log)
-                deleted_count += 1
-                logger.info(f"   ✓ Eliminado: {os.path.basename(old_log)}")
-            except Exception as e:
-                logger.warning(f"   ⚠️ Error al eliminar {os.path.basename(old_log)}: {e}")
-        
-        logger.info(f"✅ Limpieza completada: {deleted_count} logs eliminados")
+        if log_count <= 10:
+            logger.info(f"📋 Logs actuales: {log_count} archivos")
+        else:
+            logger.info(f"📋 Logs actuales: {log_count} archivos (se limpiarán al cerrar la app)")
         
     except Exception as e:
-        logger.error(f"Error al limpiar logs antiguos: {e}")
+        logger.error(f"Error al verificar logs: {e}")
 
 # Limpiar logs antiguos antes de crear el nuevo
 # cleanup_old_logs()  # <-- MOVIDO DESPUÉS DE DEFINIR LOGGER
@@ -331,8 +322,11 @@ check_system_dependencies()
 check_roi_configuration()
 logger.info("="*80)
 
-# NO inicializar BD global - cada sesión tendrá su propia BD
-# db.create_tables()  # <-- DESHABILITADO
+# Inicializar BD única persistente (sin sesiones)
+logger.info("📊 Inicializando base de datos única...")
+db.create_tables(app.config['DB_PATH'])
+logger.info(f"   ✅ BD inicializada: {app.config['DB_PATH']}")
+logger.info("="*80)
 
 # Variable global para tracking de progreso (ahora incluye info de sesión)
 processing_status = {
@@ -359,6 +353,9 @@ queue_lock = threading.Lock()
 # Diccionario para mantener sesiones activas {session_id: {db_path, folder_path, created_at, uploaded_videos}}
 active_sessions = {}
 
+# Variable para modo de análisis (duplicar archivos vs analizar desde ruta original)
+analyze_from_original_path = False  # Por defecto: duplicar archivos
+
 def get_or_create_session():
     """Obtiene o crea una sesión activa para el usuario"""
     # Por ahora, una sesión global simple (en el futuro se puede usar Flask sessions)
@@ -370,13 +367,10 @@ def get_or_create_session():
         session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
         os.makedirs(session_folder, exist_ok=True)
         
-        # Crear BD de sesión
-        session_db_path = os.path.join(session_folder, f"{session_id}.db")
+        # Usar BD única persistente en lugar de BD por sesión
+        session_db_path = app.config['DB_PATH']
         
-        # Inicializar tablas en la BD de sesión
-        db.create_tables(session_db_path)
-        
-        # Crear Excel de sesión vacío
+        # Crear Excel de sesión
         excel_path = create_or_update_session_excel(session_db_path, session_folder)
         
         # Guardar info de sesión
@@ -404,10 +398,7 @@ def get_or_create_session():
 
 def get_session_db():
     """Helper para obtener la BD de sesión actual o None"""
-    session_db_path = processing_status.get('session_db_path')
-    if session_db_path and os.path.exists(session_db_path):
-        return session_db_path
-    return None
+    return app.config['DB_PATH']  # Siempre usar BD única
 
 def cleanup_old_sessions():
     """Limpia TODAS las sesiones anteriores al iniciar el servidor - solo mantiene sesión actual"""
@@ -464,7 +455,9 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     """Página principal con sidebar y vistas dinámicas"""
-    return render_template('index.html')
+    # Agregar timestamp para evitar caché
+    cache_bust = datetime.now().strftime('%Y%m%d%H%M%S')
+    return render_template('index.html', cache_bust=cache_bust)
 
 # Dashboard ahora es una vista dentro de la aplicación principal (botón Estadísticas)
 # @app.route('/dashboard')
@@ -1406,6 +1399,13 @@ def upload_chunk():
                 if existing:
                     logger.warning(f"⚠️ [CHUNK] Video duplicado encontrado en BD: {filename}")
                     is_duplicate = True
+                    
+                    # IMPORTANTE: Agregar a la lista INCLUSO si es duplicado para permitir reprocesar
+                    if folder_id in active_sessions:
+                        active_sessions[folder_id]['uploaded_videos'].append(filename)
+                        logger.info(f"✅ [CHUNK] Video duplicado agregado a active_sessions para reprocesar: {filename}")
+                        logger.info(f"📋 [CHUNK] Lista actual de videos: {active_sessions[folder_id]['uploaded_videos']}")
+                    
                 else:
                     # Insertar el video en la BD
                     try:
@@ -1476,6 +1476,146 @@ def upload_chunk():
         logger.error(f"❌ [CHUNK] Stack trace:", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/config/analyze-mode', methods=['GET', 'POST'])
+def config_analyze_mode():
+    """
+    GET: Obtiene el modo actual de análisis
+    POST: Cambia el modo de análisis (duplicar vs analizar desde ruta original)
+    """
+    global analyze_from_original_path
+    
+    if request.method == 'GET':
+        return jsonify({
+            'success': True,
+            'analyze_from_original': analyze_from_original_path,
+            'duplicate_files': not analyze_from_original_path
+        })
+    
+    try:
+        data = request.json
+        mode = data.get('mode')  # 'duplicate' o 'original'
+        
+        if mode == 'duplicate':
+            analyze_from_original_path = False
+        elif mode == 'original':
+            analyze_from_original_path = True
+        else:
+            return jsonify({'success': False, 'error': 'Modo inválido (use: duplicate u original)'}), 400
+        
+        logger.info(f"⚙️ Modo de análisis cambiado a: {'Analizar desde ruta original' if analyze_from_original_path else 'Duplicar archivos'}")
+        
+        return jsonify({
+            'success': True,
+            'analyze_from_original': analyze_from_original_path,
+            'duplicate_files': not analyze_from_original_path,
+            'message': f"Modo cambiado a: {'Analizar desde ruta original' if analyze_from_original_path else 'Duplicar archivos'}"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error al cambiar modo de análisis: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/select-local-folder', methods=['POST'])
+def select_local_folder():
+    """
+    Endpoint para seleccionar una carpeta local del sistema de archivos.
+    Recibe la ruta de la carpeta y registra sus videos en la BD.
+    Dependiendo de la configuración, duplica archivos o analiza desde ruta original.
+    """
+    try:
+        data = request.json
+        folder_path = data.get('folder_path')
+        duplicate_files = data.get('duplicate_files', False)  # Por defecto: no duplicar
+        
+        if not folder_path or not os.path.isdir(folder_path):
+            return jsonify({'success': False, 'error': 'Ruta de carpeta inválida'}), 400
+        
+        logger.info(f"📁 Seleccionando carpeta local: {folder_path}")
+        logger.info(f"📋 Modo: {'Duplicar archivos' if duplicate_files else 'Analizar desde ruta original'}")
+        
+        # Crear sesión
+        session_id, session_db_path = get_or_create_session()
+        session_folder = processing_status['session_folder_path']
+        
+        # Escanear archivos de video en la carpeta
+        video_extensions = tuple(f".{ext}" for ext in app.config['ALLOWED_EXTENSIONS'])
+        video_files = []
+        
+        for filename in os.listdir(folder_path):
+            if filename.lower().endswith(video_extensions):
+                original_path = os.path.join(folder_path, filename)
+                video_files.append((filename, original_path))
+        
+        if not video_files:
+            return jsonify({
+                'success': False,
+                'error': 'No se encontraron videos en la carpeta seleccionada'
+            }), 400
+        
+        logger.info(f"📹 Videos encontrados: {len(video_files)}")
+        
+        # Registrar carpeta en BD
+        folder_name = os.path.basename(folder_path)
+        folder_db_id = db.insert_folder(
+            session_db_path,
+            folder_name,
+            len(video_files)
+        )
+        
+        # Procesar cada video
+        videos_registered = []
+        import shutil
+        
+        for filename, original_path in video_files:
+            try:
+                if duplicate_files:
+                    # Modo 1: Copiar archivo a la carpeta de sesión
+                    dest_path = os.path.join(session_folder, filename)
+                    logger.info(f"   📄 Copiando: {filename}")
+                    shutil.copy2(original_path, dest_path)
+                    video_path_for_db = dest_path
+                else:
+                    # Modo 2: Usar ruta original directamente
+                    logger.info(f"   📄 Registrando desde ruta original: {filename}")
+                    video_path_for_db = original_path
+                
+                # Registrar en BD
+                video_id = db.insert_video(
+                    session_db_path,
+                    folder_db_id,
+                    filename,
+                    video_path_for_db  # Guardar la ruta que se usará
+                )
+                
+                videos_registered.append({
+                    'id': video_id,
+                    'filename': filename,
+                    'original_path': original_path,
+                    'duplicated': duplicate_files
+                })
+                
+            except Exception as e:
+                logger.error(f"❌ Error procesando {filename}: {e}")
+                continue
+        
+        logger.info(f"✅ Carpeta registrada: {len(videos_registered)} videos")
+        
+        return jsonify({
+            'success': True,
+            'folder_id': folder_db_id,
+            'folder_name': folder_name,
+            'session_id': session_id,
+            'videos_found': len(video_files),
+            'videos_registered': len(videos_registered),
+            'duplicate_mode': duplicate_files,
+            'videos': videos_registered
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error al seleccionar carpeta local: {e}")
+        logger.error(f"Stack trace:", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/process', methods=['POST'])
 def process_videos():
     """Procesa videos para detectar movimiento (con sistema de cola)"""
@@ -1510,18 +1650,16 @@ def process_videos():
         # folder_id ahora es un session_id (session_YYYYMMDD_HHMMSS)
         session_id = folder_id
         session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
-        session_db_path = os.path.join(session_folder, f"{session_id}.db")
+        
+        # Usar BD única persistente en lugar de BD por sesión
+        session_db_path = app.config['DB_PATH']
         
         if not os.path.exists(session_folder):
             logger.error(f"❌ Carpeta de sesión no encontrada: {session_folder}")
             return jsonify({'success': False, 'error': 'Sesión no encontrada'}), 404
         
-        if not os.path.exists(session_db_path):
-            logger.error(f"❌ BD de sesión no encontrada: {session_db_path}")
-            return jsonify({'success': False, 'error': 'BD de sesión no encontrada'}), 404
-        
         logger.info(f"✓ Sesión encontrada: {session_id}")
-        logger.info(f"✓ BD de sesión: {session_db_path}")
+        logger.info(f"✓ BD única: {session_db_path}")
         
         # Registrar carpeta en BD de la sesión AHORA (al iniciar procesamiento)
         conn = db.create_db_connection(session_db_path)
@@ -3206,9 +3344,30 @@ def save_excel_data():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def cleanup_all_on_exit():
-    """Limpia TODAS las sesiones al cerrar el servidor"""
+    """Limpia TODAS las sesiones y logs antiguos al cerrar el servidor"""
     logger.info("="*80)
-    logger.info("🛑 Cerrando servidor - Limpiando todas las sesiones...")
+    logger.info("🛑 Cerrando servidor - Limpiando sesiones y logs antiguos...")
+    
+    # Primero limpiar logs antiguos (ahora que cerramos, podemos borrarlos)
+    try:
+        log_files = [f for f in os.listdir(log_folder) if f.startswith('session_') and f.endswith('.log')]
+        if len(log_files) > 10:
+            log_paths = [os.path.join(log_folder, f) for f in log_files]
+            log_paths.sort(key=os.path.getmtime, reverse=True)
+            files_to_delete = log_paths[10:]  # Mantener solo los 10 más recientes
+            
+            deleted = 0
+            for old_log in files_to_delete:
+                try:
+                    os.remove(old_log)
+                    deleted += 1
+                except:
+                    pass
+            
+            if deleted > 0:
+                logger.info(f"🧹 Logs antiguos eliminados: {deleted}")
+    except Exception as e:
+        logger.debug(f"Error al limpiar logs: {e}")
     
     upload_folder = app.config['UPLOAD_FOLDER']
     if not os.path.exists(upload_folder):
@@ -3263,73 +3422,6 @@ def cleanup_all_on_exit():
     logger.info(f"✅ Limpieza completada: {cleaned_count} elementos eliminados")
     logger.info("👋 Servidor cerrado correctamente")
     logger.info("="*80)
-
-# ====================================================================
-# 🖥️ ENDPOINTS PARA MODO LOCAL (ELECTRON)
-# ====================================================================
-
-@app.route('/api/local/folders', methods=['GET'])
-def get_local_folders():
-    """Obtiene todas las carpetas de videos del almacenamiento local"""
-    try:
-        import local_storage
-        storage = local_storage.get_storage()
-        folders = storage.get_all_folders()
-        
-        return jsonify({
-            'success': True,
-            'folders': folders,
-            'base_path': storage.videos_folder
-        })
-    except Exception as e:
-        logger.error(f"Error al obtener carpetas locales: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/local/add-folder', methods=['POST'])
-def add_local_folder():
-    """Agrega una carpeta del sistema a la aplicación"""
-    try:
-        data = request.json
-        folder_path = data.get('path')
-        
-        if not folder_path:
-            return jsonify({'success': False, 'error': 'No se proporcionó ruta'}), 400
-        
-        import local_storage
-        storage = local_storage.get_storage()
-        folder_name, link_path = storage.add_folder_reference(folder_path)
-        
-        return jsonify({
-            'success': True,
-            'folder_name': folder_name,
-            'link_path': link_path
-        })
-    except Exception as e:
-        logger.error(f"Error al agregar carpeta: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/local/add-files', methods=['POST'])
-def add_local_files():
-    """Agrega archivos individuales a 'Videos Sueltos'"""
-    try:
-        data = request.json
-        file_paths = data.get('paths', [])
-        
-        if not file_paths:
-            return jsonify({'success': False, 'error': 'No se proporcionaron archivos'}), 400
-        
-        import local_storage
-        storage = local_storage.get_storage()
-        copied = storage.copy_files_to_loose(file_paths)
-        
-        return jsonify({
-            'success': True,
-            'copied_count': len(copied),
-            'files': copied
-        })
-    except Exception as e:
-        logger.error(f"Error al agregar archivos: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Registrar función de limpieza para cuando se cierre el servidor

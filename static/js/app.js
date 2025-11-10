@@ -2,6 +2,13 @@
 // VERSIÓN: 20251107-chunks-50MB-fix-spaces
 console.log('🔵 app.js CARGADO - Versión: 20251107-chunks-50MB-fix-spaces (Chunking 50MB + fix espacios en nombres)');
 
+// Detectar si estamos en Electron
+const isElectronApp = !!(window.electron && window.electron.isElectron);
+console.log(`🔍 Entorno detectado: ${isElectronApp ? 'Electron Desktop App' : 'Navegador Web'}`);
+if (isElectronApp) {
+    console.log('✅ API de Electron disponible:', Object.keys(window.electron));
+}
+
 // Estado global de la aplicación
 const appState = {
     currentView: 'welcome',
@@ -2427,6 +2434,14 @@ function showAdvancedConfigView() {
                         <input type="number" id="cooldownMs" value="8000" step="1000" min="1000" max="60000" class="form-control">
                         <small>Tiempo mínimo entre detecciones consecutivas</small>
                     </div>
+                    
+                    <div class="setting-group" id="localFolderSettingGroup" style="display:none">
+                        <label>
+                            <input type="checkbox" id="duplicateFiles" checked>
+                            Duplicar archivos al seleccionar carpeta local
+                        </label>
+                        <small>Si está desactivado, los videos se analizarán desde su ubicación original sin copiarlos</small>
+                    </div>
                 </div>
                 
                 <div class="config-actions">
@@ -2444,6 +2459,20 @@ function showAdvancedConfigView() {
     `;
     
     document.getElementById('main-panel').innerHTML = content;
+    
+    // Mostrar opción de carpeta local solo en Electron
+    console.log('🔍 Verificando si mostrar opción de carpeta local...', { isElectronApp });
+    if (isElectronApp) {
+        const localFolderSetting = document.getElementById('localFolderSettingGroup');
+        if (localFolderSetting) {
+            console.log('✅ Mostrando opción de carpeta local en Configuración Avanzada');
+            localFolderSetting.style.display = 'block';
+        } else {
+            console.error('❌ No se encontró el elemento localFolderSettingGroup');
+        }
+    } else {
+        console.log('ℹ️ No es Electron, ocultando opción de carpeta local');
+    }
     
     // Cargar configuración guardada
     loadAdvancedConfig();
@@ -4691,10 +4720,22 @@ function cancelROIProcessing() {
 }
 
 function loadAdvancedConfig() {
-    const config = JSON.parse(localStorage.getItem('advancedConfig') || '{"threshold":0.5,"variance":16,"cooldown":8000}');
+    const config = JSON.parse(localStorage.getItem('advancedConfig') || '{"threshold":0.5,"variance":16,"cooldown":8000,"duplicateFiles":true}');
     document.getElementById('thresholdPercentage').value = config.threshold;
     document.getElementById('varThreshold').value = config.variance;
     document.getElementById('cooldownMs').value = config.cooldown;
+    
+    // Cargar preferencia de carpeta local (solo en Electron)
+    console.log('📋 Cargando configuración avanzada...', { isElectronApp, config });
+    if (isElectronApp) {
+        const duplicateFilesCheckbox = document.getElementById('duplicateFiles');
+        if (duplicateFilesCheckbox) {
+            duplicateFilesCheckbox.checked = config.duplicateFiles !== false; // Por defecto true
+            console.log('✅ Checkbox de duplicar archivos cargado:', duplicateFilesCheckbox.checked);
+        } else {
+            console.warn('⚠️ No se encontró el checkbox duplicateFiles');
+        }
+    }
 }
 
 function saveAdvancedConfig() {
@@ -4703,7 +4744,18 @@ function saveAdvancedConfig() {
         variance: parseInt(document.getElementById('varThreshold').value),
         cooldown: parseInt(document.getElementById('cooldownMs').value)
     };
+    
+    // Guardar preferencia de carpeta local (solo en Electron)
+    if (isElectronApp) {
+        const duplicateFilesCheckbox = document.getElementById('duplicateFiles');
+        if (duplicateFilesCheckbox) {
+            config.duplicateFiles = duplicateFilesCheckbox.checked;
+            console.log('💾 Guardando preferencia de duplicar archivos:', config.duplicateFiles);
+        }
+    }
+    
     localStorage.setItem('advancedConfig', JSON.stringify(config));
+    console.log('✅ Configuración guardada:', config);
     showNotification('✓ Configuración avanzada guardada', 'success');
 }
 

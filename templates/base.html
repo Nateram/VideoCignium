@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>{% block title %}Detector de Movimiento en Punto Caliente - Análisis Inteligente{% endblock %}</title>
     
     <!-- CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20251110-nocache">
     
     <!-- Font Awesome para iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -134,11 +137,11 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Config global (debe cargarse PRIMERO) -->
-    <script src="{{ url_for('static', filename='js/config.js') }}?v=20251107-50mb"></script>
+    <script src="{{ url_for('static', filename='js/config.js') }}?v=20251110-nocache"></script>
     <!-- Scripts de la aplicación -->
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=20251107-50mb"></script>
-    <script src="{{ url_for('static', filename='js/directo.js') }}?v=20251107-50mb"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=20251107-50mb"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20251110-nocache"></script>
+    <script src="{{ url_for('static', filename='js/directo.js') }}?v=20251110-nocache"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=20251110-nocache"></script>
     <!-- Handsontable JS -->
     <script src="https://cdn.jsdelivr.net/npm/handsontable@14.0.0/dist/handsontable.full.min.js"></script>
     {% block extra_js %}{% endblock %}
