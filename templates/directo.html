@@ -1,0 +1,22 @@
+{% extends "base_simple.html" %}
+{% block title %}Análisis en Directo - Detector de Movimiento{% endblock %}
+{% block content %}
+<div class="directo-container" style="display: flex; gap: 32px; margin-top: 40px;">
+    <div style="flex: 2;">
+        <h2>Stream en Directo</h2>
+        <img id="directoStream" src="http://localhost:8080/video_feed" width="640" height="480" style="border-radius: 12px; border: 3px solid #3B82F6;">
+        <div style="margin-top: 18px;">
+            <label>ROI (x, y, w, h):</label>
+            <input type="number" id="roiX" value="0" style="width:60px;">
+            <input type="number" id="roiY" value="0" style="width:60px;">
+            <input type="number" id="roiW" value="640" style="width:60px;">
+            <input type="number" id="roiH" value="480" style="width:60px;">
+            <button class="btn" onclick="startDirectoAnalysis()">Iniciar Análisis</button>
+        </div>
+    </div>
+    <div style="flex: 1; background: #1e293b; border-radius: 12px; padding: 18px; color: #fff; min-width: 260px;">
+        <h3>Logs de Eventos</h3>
+        <div id="directoLogs" style="height: 400px; overflow-y: auto; background: #222; border-radius: 8px; padding: 10px; font-size: 1.05em;"></div>
+    </div>
+</div>
+{% endblock %}

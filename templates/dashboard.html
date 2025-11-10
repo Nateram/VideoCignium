@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Detector de Movimiento IA{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">
+        <i class="fas fa-chart-line"></i> Dashboard de Análisis
+    </h1>
+
+    <!-- Estadísticas generales -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+            <i class="fas fa-folder stat-icon"></i>
+            <h3 class="stat-number" id="totalFolders">0</h3>
+            <p class="stat-label">Carpetas Analizadas</p>
+        </div>
+        <div class="stat-card">
+            <i class="fas fa-video stat-icon"></i>
+            <h3 class="stat-number" id="totalVideos">0</h3>
+            <p class="stat-label">Videos Procesados</p>
+        </div>
+        <div class="stat-card">
+            <i class="fas fa-film stat-icon"></i>
+            <h3 class="stat-number" id="totalClips">0</h3>
+            <p class="stat-label">Clips Generados</p>
+        </div>
+        <div class="stat-card">
+            <i class="fas fa-car stat-icon"></i>
+            <h3 class="stat-number" id="totalObjects">0</h3>
+            <p class="stat-label">Objetos Detectados</p>
+        </div>
+    </div>
+
+    <!-- Gráfico de objetos detectados -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-bar"></i> Distribución de Objetos Detectados</h2>
+        </div>
+        <div class="card-body">
+            <canvas id="objectsChart" height="100"></canvas>
+        </div>
+    </div>
+
+    <!-- Lista de carpetas analizadas -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-folder-open"></i> Carpetas Analizadas</h2>
+        </div>
+        <div class="card-body">
+            <div id="foldersList" class="folders-list">
+                <p class="loading-text"><i class="fas fa-spinner fa-spin"></i> Cargando...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ver videos de una carpeta -->
+    <div id="videosModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"><i class="fas fa-video"></i> Videos</h2>
+                <span class="close-modal" onclick="closeVideosModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="videosList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ver clips de un video -->
+    <div id="clipsModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="clipsModalTitle"><i class="fas fa-film"></i> Clips Detectados</h2>
+                <span class="close-modal" onclick="closeClipsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="clipsList" class="clips-grid"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
