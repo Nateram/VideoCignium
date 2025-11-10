@@ -86,6 +86,46 @@ def create_db_connection(db_path=None):
         logger.critical(f"Error al conectar a la base de datos: {e}")
         raise Exception(f"No se pudo crear la conexión a la base de datos: {e}")
 
+def migrate_database_schema(conn):
+    """Migra la base de datos del esquema antiguo al nuevo"""
+    cursor = conn.cursor()
+    
+    try:
+        # Verificar si existe la columna 'ruta' en carpetas (esquema antiguo)
+        cursor.execute("PRAGMA table_info(carpetas)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        if 'path' in columns and 'ruta' not in columns:
+            logger.info("🔄 Migrando esquema de carpetas (path → ruta)...")
+            cursor.execute("ALTER TABLE carpetas RENAME COLUMN path TO ruta")
+            conn.commit()
+            logger.info("✅ Columna 'path' renombrada a 'ruta'")
+        
+        # Verificar videos
+        cursor.execute("PRAGMA table_info(videos)")
+        video_columns = [col[1] for col in cursor.fetchall()]
+        
+        if 'file_name' in video_columns and 'nombre_archivo' not in video_columns:
+            logger.info("🔄 Migrando esquema de videos (file_name → nombre_archivo)...")
+            cursor.execute("ALTER TABLE videos RENAME COLUMN file_name TO nombre_archivo")
+            conn.commit()
+            logger.info("✅ Columna 'file_name' renombrada a 'nombre_archivo'")
+        
+        if 'absolute_path' in video_columns and 'ruta_absoluta' not in video_columns:
+            logger.info("🔄 Migrando esquema de videos (absolute_path → ruta_absoluta)...")
+            cursor.execute("ALTER TABLE videos RENAME COLUMN absolute_path TO ruta_absoluta")
+            conn.commit()
+            logger.info("✅ Columna 'absolute_path' renombrada a 'ruta_absoluta'")
+            
+        if 'creation_date' in video_columns and 'fecha_creacion' not in video_columns:
+            logger.info("🔄 Migrando esquema de videos (creation_date → fecha_creacion)...")
+            cursor.execute("ALTER TABLE videos RENAME COLUMN creation_date TO fecha_creacion")
+            conn.commit()
+            logger.info("✅ Columna 'creation_date' renombrada a 'fecha_creacion'")
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Error durante migración (puede ser normal si ya está migrado): {e}")
+
 def create_tables(db_path=None):
     """
     Crea las tablas de la base de datos si no existen.
@@ -95,6 +135,27 @@ def create_tables(db_path=None):
     """
     conn = create_db_connection(db_path)
     cursor = conn.cursor()
+    
+    # Verificar si la tabla videos existe con esquema antiguo
+    try:
+        cursor.execute("PRAGMA table_info(videos)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        # Si existe con el esquema antiguo (nombre, ruta_local), eliminar y recrear
+        if 'nombre' in columns or 'ruta_local' in columns:
+            logger.warning("⚠️ Detectado esquema antiguo en la BD. Recreando tablas...")
+            cursor.execute("DROP TABLE IF EXISTS clips")
+            cursor.execute("DROP TABLE IF EXISTS videos")
+            cursor.execute("DROP TABLE IF EXISTS carpetas")
+            cursor.execute("DROP TABLE IF EXISTS configuracion_deteccion")
+            conn.commit()
+            logger.info("✅ Tablas antiguas eliminadas")
+    except Exception as e:
+        logger.debug(f"Verificación de esquema: {e}")
+    
+    # Intentar migrar esquema antiguo si existe (para BDs que usen file_name, etc.)
+    migrate_database_schema(conn)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS carpetas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,6 +174,10 @@ def create_tables(db_path=None):
             roi_y INTEGER,
             roi_w INTEGER,
             roi_h INTEGER,
+            duracion_segundos REAL,
+            fps REAL,
+            resolucion TEXT,
+            procesado INTEGER DEFAULT 0,
             FOREIGN KEY (carpeta_id) REFERENCES carpetas (id)
         );
     """)
