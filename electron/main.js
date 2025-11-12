@@ -102,59 +102,96 @@ function startFlask() {
     console.log('📁 BASE_DIR:', BASE_DIR);
     console.log('📄 Python script:', PYTHON_SCRIPT);
 
-    // Buscar Python en el sistema (Windows específico)
+    // Buscar Python PORTABLE primero, luego Python del sistema
     const { spawnSync } = require('child_process');
-    const pythonCommands = [
-      'python',
-      'python3', 
-      'py',
-      'py -3',
-      'C:\\Users\\pabli\\AppData\\Local\\Microsoft\\WindowsApps\\python3.13.exe',
-      'C:\\Python313\\python.exe',
-      'C:\\Python312\\python.exe',
-      'C:\\Python311\\python.exe',
-      'C:\\Python310\\python.exe'
-    ];
+    
+    // PRIORIDAD 1: Python portable incluido en la aplicación
+    // Usar pythonw.exe (sin ventana) en lugar de python.exe
+    const portablePythonW = path.join(BASE_DIR, 'python-portable', 'pythonw.exe');
+    const portablePython = path.join(BASE_DIR, 'python-portable', 'python.exe');
     
     let pythonCmd = null;
     let pythonArgs = [];
-
-    // Encontrar el comando Python disponible
-    for (const cmd of pythonCommands) {
+    
+    // Si existe Python portable, usar pythonw.exe para NO mostrar terminal
+    if (fs.existsSync(portablePythonW)) {
+      console.log('✨ Python PORTABLE (sin ventana) detectado en:', portablePythonW);
+      pythonCmd = portablePythonW;
+      pythonArgs = [];
+      
+      // Intentar obtener versión con python.exe (pythonw no muestra output)
       try {
-        const parts = cmd.split(' ');
-        const executable = parts[0];
-        const args = parts.slice(1);
-        
-        const result = spawnSync(executable, [...args, '--version'], { 
+        const result = spawnSync(portablePython, ['--version'], { 
           shell: true,
-          windowsHide: true 
+          windowsHide: true,
+          timeout: 3000
         });
-        
-        if (result.status === 0 || result.stdout.toString().includes('Python')) {
-          pythonCmd = executable;
-          pythonArgs = args;
-          const version = (result.stdout || result.stderr).toString().trim();
-          console.log(`✅ Python encontrado: ${cmd}`);
+        const version = (result.stdout || result.stderr).toString().trim();
+        if (version) {
           console.log(`   Versión: ${version}`);
-          break;
         }
       } catch (e) {
-        console.log(`   ❌ No funciona: ${cmd}`, e.message);
-        continue;
+        console.log('   ⚠️ No se pudo verificar versión, pero se usará Python portable');
       }
-    }
-
-    if (!pythonCmd) {
-      const errorMsg = 'No se encontró Python instalado en el sistema.\n\n' +
-        'Por favor instala Python 3.8 o superior desde:\n' +
-        'https://www.python.org/downloads/\n\n' +
-        'Comandos probados:\n' + pythonCommands.join('\n');
+    } else if (fs.existsSync(portablePython)) {
+      // Fallback a python.exe si pythonw.exe no existe (desarrollo)
+      console.log('✨ Python PORTABLE detectado en:', portablePython);
+      pythonCmd = portablePython;
+      pythonArgs = [];
+    } else {
+      // Si NO existe Python portable, buscar Python del sistema
+      console.log('🔍 Buscando Python del sistema...');
       
-      console.error('❌', errorMsg);
-      dialog.showErrorBox('Python no encontrado', errorMsg);
-      reject(new Error('Python no encontrado'));
-      return;
+      const pythonCommands = [
+        'python',
+        'python3', 
+        'py',
+        'py -3',
+        'C:\\Users\\pabli\\AppData\\Local\\Microsoft\\WindowsApps\\python3.13.exe',
+        'C:\\Python313\\python.exe',
+        'C:\\Python312\\python.exe',
+        'C:\\Python311\\python.exe',
+        'C:\\Python310\\python.exe'
+      ];
+
+      // Encontrar el comando Python disponible
+      for (const cmd of pythonCommands) {
+        try {
+          const parts = cmd.split(' ');
+          const executable = parts[0];
+          const args = parts.slice(1);
+          
+          const result = spawnSync(executable, [...args, '--version'], { 
+            shell: true,
+            windowsHide: true,
+            timeout: 3000
+          });
+          
+          if (result.status === 0 || result.stdout.toString().includes('Python')) {
+            pythonCmd = executable;
+            pythonArgs = args;
+            const version = (result.stdout || result.stderr).toString().trim();
+            console.log(`✅ Python encontrado: ${cmd}`);
+            console.log(`   Versión: ${version}`);
+            break;
+          }
+        } catch (e) {
+          console.log(`   ❌ No funciona: ${cmd}`, e.message);
+          continue;
+        }
+      }
+
+      if (!pythonCmd) {
+        const errorMsg = 'No se encontró Python instalado en el sistema.\n\n' +
+          'Por favor instala Python 3.8 o superior desde:\n' +
+          'https://www.python.org/downloads/\n\n' +
+          'Comandos probados:\n' + pythonCommands.join('\n');
+        
+        console.error('❌', errorMsg);
+        dialog.showErrorBox('Python no encontrado', errorMsg);
+        reject(new Error('Python no encontrado'));
+        return;
+      }
     }
 
     // Configurar variables de entorno
@@ -164,14 +201,17 @@ function startFlask() {
     
     // Iniciar Flask con shell en Windows
     const allArgs = [...pythonArgs, PYTHON_SCRIPT];
-    console.log(`🔧 Comando: ${pythonCmd} ${allArgs.join(' ')}`);
+    
+    // En Windows con rutas con espacios, usar comillas y comando completo
+    const fullCommand = `"${pythonCmd}" ${allArgs.map(arg => `"${arg}"`).join(' ')}`;
+    console.log(`🔧 Comando completo: ${fullCommand}`);
     console.log(`📁 Working dir: ${BASE_DIR}`);
     
-    flaskProcess = spawn(pythonCmd, allArgs, {
+    flaskProcess = spawn(fullCommand, [], {
       cwd: BASE_DIR,
       env: env,
       shell: true,
-      windowsHide: false,
+      windowsHide: true,  // ✅ Ocultar ventana del terminal
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
@@ -215,7 +255,9 @@ function startFlask() {
 
     flaskProcess.on('close', (code) => {
       console.log(`⚠️ Flask cerrado con código: ${code}`);
-      if (code !== 0 && code !== null && !app.isQuitting) {
+      // ✅ NO mostrar diálogo si la app se está cerrando intencionalmente
+      // Solo alertar si el código es anormal Y no estamos cerrando la app
+      if (code !== 0 && code !== 1 && code !== null && !app.isQuitting) {
         console.error('❌ Flask cerró inesperadamente con código:', code);
         dialog.showErrorBox(
           'Error del servidor',
