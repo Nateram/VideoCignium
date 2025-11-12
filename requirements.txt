@@ -1,42 +1,25 @@
-# Requirements para la aplicación web Flask
-# Compatible con Python 3.13
+# Flask y extensiones web
+Flask>=3.0.0
+flask-cors>=4.0.0
+Werkzeug>=3.0.0
 
-# Herramientas de build (instalar primero)
-setuptools>=70.0.0
-wheel>=0.42.0
+# Procesamiento de video e imágenes
+opencv-python>=4.8.0
+numpy>=1.24.0,<2.0.0
+Pillow>=10.0.0
 
-# Framework web
-Flask==3.0.3
-Flask-CORS==4.0.0
+# OCR
+easyocr>=1.7.0
 
-# Servidor WSGI para producción (solo Linux/Mac, en Windows usa waitress)
-# gunicorn==21.2.0
+# Procesamiento de datos
+pandas>=2.0.0
 
-# Servidor WSGI para Windows
-waitress==3.0.0
+# HTTP requests
+requests>=2.31.0
 
-# Utilidades
-Werkzeug==3.0.3
+# PyTorch (requerido por ultralytics y easyocr) - versión estable compatible con Python 3.11
+torch>=2.1.0
+torchvision>=0.16.0
 
-# Dependencias de red y HTTP
-urllib3>=2.0.0
-
-# Dependencias existentes del proyecto (actualizadas para Python 3.13)
-opencv-python>=4.10.0.84
-numpy>=1.26.0
-Pillow>=10.4.0
-pandas>=2.2.0
-xlsxwriter>=3.2.0
-openpyxl>=3.1.0
-easyocr>=1.7.1
-ultralytics>=8.2.0
-torch>=2.3.0
-torchvision>=0.18.0
-torchaudio>=2.3.0
-
-# Base de datos (ya incluida en Python)
-# sqlite3 viene con Python
-
-# Opcional: para procesamiento asíncrono avanzado
-# celery==5.3.4
-# redis==5.0.1
+# Detección de objetos YOLO - versión compatible con Python 3.11
+ultralytics>=8.0.0

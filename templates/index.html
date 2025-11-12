@@ -73,4 +73,58 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+    // Forzar limpieza de caché al cargar
+    if ('caches' in window) {
+        caches.keys().then(function(names) {
+            for (let name of names) caches.delete(name);
+        });
+    }
+    
+    // Función para eliminar el tercer botón
+    function removeThirdButton() {
+        // Buscar todos los botones de upload
+        const buttons = document.querySelectorAll('.btn-upload-option');
+        
+        // Si hay más de 2 botones, eliminar los extras
+        if (buttons.length > 2) {
+            console.warn('⚠️ Detectados ' + buttons.length + ' botones, eliminando extras...');
+            for (let i = 2; i < buttons.length; i++) {
+                buttons[i].remove();
+                console.log('✅ Botón ' + (i + 1) + ' eliminado');
+            }
+        }
+        
+        // Buscar específicamente botones con estas clases/ids
+        const selectorsToRemove = [
+            '.btn-local',
+            '#btnSelectLocalFolder',
+            'button[onclick*="selectLocalFolder"]'
+        ];
+        
+        selectorsToRemove.forEach(selector => {
+            const btn = document.querySelector(selector);
+            if (btn) {
+                console.warn('⚠️ Detectado botón por selector: ' + selector + ', eliminando...');
+                btn.remove();
+            }
+        });
+        
+        // Verificar texto del botón
+        document.querySelectorAll('.btn-upload-option').forEach(btn => {
+            const text = btn.textContent.toLowerCase();
+            if (text.includes('carpeta local') || text.includes('analiza carpetas')) {
+                console.warn('⚠️ Detectado botón por texto, eliminando...');
+                btn.remove();
+            }
+        });
+    }
+    
+    // Ejecutar inmediatamente y después del DOM
+    removeThirdButton();
+    document.addEventListener('DOMContentLoaded', removeThirdButton);
+    
+    // Ejecutar otra vez después de 100ms por si acaso
+    setTimeout(removeThirdButton, 100);
+</script>
 {% endblock %}
