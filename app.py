@@ -3290,18 +3290,18 @@ def get_excel_data():
     try:
         session_db_path = get_session_db()
         if not session_db_path:
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
+            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
 
         # Obtener información de la sesión
         session_id = processing_status.get('session_id')
         if not session_id:
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
+            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
 
         session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
         excel_file = os.path.join(session_folder, 'session_data.xlsx')
 
         if not excel_file or not os.path.exists(excel_file):
-            return jsonify({'success': False, 'error': 'Archivo Excel de sesión no encontrado. Genera el análisis primero.'}), 404
+            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
 
         # Leer el Excel y convertir a formato JSON
         excel_data = {}
@@ -3349,18 +3349,18 @@ def download_excel_file():
     try:
         session_db_path = get_session_db()
         if not session_db_path:
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
+            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
 
         # Obtener información de la sesión
         session_id = processing_status.get('session_id')
         if not session_id:
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
+            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
 
         session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
         excel_file = os.path.join(session_folder, 'session_data.xlsx')
 
         if not excel_file or not os.path.exists(excel_file):
-            return jsonify({'success': False, 'error': 'Archivo Excel de sesión no encontrado'}), 404
+            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
 
         # Enviar el archivo
         return send_file(excel_file, as_attachment=True, download_name='session_data.xlsx')

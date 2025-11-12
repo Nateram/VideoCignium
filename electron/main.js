@@ -23,6 +23,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    frame: false, // Quitar barra de título por defecto de Windows
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -31,7 +32,8 @@ function createWindow() {
     },
     icon: path.join(__dirname, 'icon.png'),
     title: 'Detector de Movimiento',
-    backgroundColor: '#f5f5f5'
+    backgroundColor: '#1E293B', // Color del tema
+    titleBarStyle: 'hidden'
   });
 
   // Ocultar menú en producción
@@ -338,6 +340,25 @@ app.on('window-all-closed', () => {
 // ====================================================================
 // 🔥 IPC Handlers - Comunicación con el renderer
 // ====================================================================
+
+// Controles de ventana personalizados
+ipcMain.on('window-minimize', () => {
+  if (mainWindow) mainWindow.minimize();
+});
+
+ipcMain.on('window-maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('window-close', () => {
+  if (mainWindow) mainWindow.close();
+});
 
 // Selector de carpeta nativo
 ipcMain.handle('select-folder', async () => {
