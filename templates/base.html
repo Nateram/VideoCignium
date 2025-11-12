@@ -9,7 +9,7 @@
     <title>{% block title %}Detector de Movimiento en Punto Caliente - Análisis Inteligente{% endblock %}</title>
     
     <!-- CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20251110-nocache">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20251112-v8">
     
     <!-- Font Awesome para iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -21,6 +21,27 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- Barra de título personalizada (solo en Electron) -->
+        <div class="custom-titlebar" id="customTitlebar" style="display: none;">
+            <div class="titlebar-drag-region">
+                <div class="titlebar-icon">
+                    <i class="fas fa-video"></i>
+                </div>
+                <div class="titlebar-title">Detector de Movimiento IA</div>
+            </div>
+            <div class="titlebar-controls">
+                <button class="titlebar-button" onclick="window.electron?.windowMinimize()" title="Minimizar">
+                    <i class="fas fa-window-minimize"></i>
+                </button>
+                <button class="titlebar-button" onclick="window.electron?.windowMaximize()" title="Maximizar/Restaurar">
+                    <i class="far fa-window-maximize"></i>
+                </button>
+                <button class="titlebar-button titlebar-close" onclick="window.electron?.windowClose()" title="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        
         <!-- Sidebar izquierdo (réplica exacta de la app desktop) -->
         <aside class="sidebar">
             <div class="sidebar-header">
@@ -53,7 +74,7 @@
                         <span>Seleccionar Video</span>
                     </button>
                     <button class="sidebar-btn" onclick="loadView('process', event)" id="statusAnalysisBtn">
-                        <span id="statusAnalysisIcon">�</span>
+                        <span id="statusAnalysisIcon">📊</span>
                         <span>Estado de Análisis</span>
                         <span class="analysis-spinner" id="analysisSpinner" style="display: none;">
                             <i class="fas fa-circle-notch fa-spin"></i>
@@ -86,23 +107,12 @@
                         INFORMACIÓN
                     </div>
                     <button class="sidebar-btn" onclick="loadView('excel', event)">
-                        <span>📊</span>
+                        <span><i class="fas fa-file-excel"></i></span>
                         <span>Excel</span>
                     </button>
                     <button class="sidebar-btn" onclick="loadView('help', event)">
                         <span>❓</span>
                         <span>Ayuda</span>
-                    </button>
-                </div>
-
-                <!-- Sección Sesión -->
-                <div class="sidebar-section">
-                    <div class="section-title">
-                        SESIÓN
-                    </div>
-                    <button class="sidebar-btn btn-danger" onclick="endSession()" title="Elimina todos los archivos y datos de la sesión actual">
-                        <span>🗑️</span>
-                        <span>Finalizar Sesión</span>
                     </button>
                 </div>
             </nav>
@@ -115,13 +125,15 @@
         
         <!-- Área de contenido principal -->
         <div class="content-area">
-            <!-- Barra superior -->
+            <!-- Barra superior mejorada -->
             <div class="top-bar">
-                <h2 id="view-title">Detector de Movimiento IA</h2>
+                <div class="top-bar-left">
+                    <h2 id="view-title">Detector de Movimiento IA</h2>
+                </div>
                 <div class="top-bar-actions">
                     <button class="btn-top-bar" onclick="loadView('logs', event)" title="Ver logs del sistema">
                         <i class="fas fa-file-alt"></i>
-                        Ver Logs
+                        <span>Logs del Sistema</span>
                     </button>
                 </div>
             </div>
@@ -138,6 +150,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Config global (debe cargarse PRIMERO) -->
     <script src="{{ url_for('static', filename='js/config.js') }}?v=20251110-nocache"></script>
+    
+    <!-- Script para mostrar titlebar solo en Electron -->
+    <script>
+        if (window.electron && window.electron.isElectron) {
+            document.getElementById('customTitlebar').style.display = 'flex';
+            // Ajustar padding del app-container para la titlebar
+            document.querySelector('.app-container').style.paddingTop = '32px';
+        }
+    </script>
+    
     <!-- Scripts de la aplicación -->
     <script src="{{ url_for('static', filename='js/main.js') }}?v=20251110-nocache"></script>
     <script src="{{ url_for('static', filename='js/directo.js') }}?v=20251110-nocache"></script>

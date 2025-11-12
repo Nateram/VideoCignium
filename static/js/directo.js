@@ -360,6 +360,19 @@ window.showDirectoInitView = function() {
     }
     const content = `
         <div class="roi-processing-container">
+            <!-- Banner de desarrollo -->
+            <div style="background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <span style="font-size: 2.5em;">🚧</span>
+                    <div>
+                        <h3 style="margin: 0; color: #fff; font-size: 1.3em; font-weight: 600;">Apartado en Desarrollo</h3>
+                        <p style="margin: 8px 0 0 0; color: #fff; opacity: 0.95; font-size: 1.05em;">
+                            Esta sección es una <strong>demo de procesamiento en tiempo real personal</strong>. Las funcionalidades están en fase de pruebas y desarrollo.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
             <div style="margin-bottom:24px;">
                 <label for="streamUrlInput"><strong>URL del Stream MJPEG:</strong></label>
                 <input type="text" id="streamUrlInput" value="http://localhost:8080/video_feed" style="width:100%;margin-bottom:10px;">
@@ -624,6 +637,19 @@ window.forceDirectoConfigView = function() {
     }
     const content = `
         <div class="roi-processing-container">
+            <!-- Banner de desarrollo -->
+            <div style="background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <span style="font-size: 2.5em;">🚧</span>
+                    <div>
+                        <h3 style="margin: 0; color: #fff; font-size: 1.3em; font-weight: 600;">Apartado en Desarrollo</h3>
+                        <p style="margin: 8px 0 0 0; color: #fff; opacity: 0.95; font-size: 1.05em;">
+                            Esta sección es una <strong>demo de procesamiento en tiempo real personal</strong>. Las funcionalidades están en fase de pruebas y desarrollo.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
             <div style="margin-bottom:24px;">
                 <label for="streamUrlInput"><strong>URL del Stream MJPEG:</strong></label>
                 <input type="text" id="streamUrlInput" value="${document.getElementById('streamUrlInput') ? document.getElementById('streamUrlInput').value : 'http://localhost:8080/video_feed'}" style="width:100%;margin-bottom:10px;">

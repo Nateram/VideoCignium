@@ -124,6 +124,15 @@ function loadView(viewName, evt) {
     appState.currentView = viewName;
 }
 
+// Función global para actualizar el display de segundos del cooldown
+window.updateCooldownDisplay = function(ms) {
+    const cooldownSecondsEl = document.getElementById('cooldownSeconds');
+    if (cooldownSecondsEl) {
+        const seconds = (ms / 1000).toFixed(1);
+        cooldownSecondsEl.textContent = seconds + ' segundos';
+    }
+};
+
 // Vista: Pantalla de bienvenida (simple y moderna como la imagen)
 
 // Cargar estado del sistema
@@ -378,30 +387,82 @@ async function loadVideosForFolder(folderId, container) {
             return;
         }
         
-        let html = '';
-        data.videos.forEach(video => {
-            html += `
-                <div class="tree-item-container">
-                    <div class="tree-item" onclick="toggleVideo(${video.id}, this)">
-                        <span class="expand-icon">▶</span>
-                        <i class="fas fa-file-video item-icon"></i>
-                        <span>${video.name} (${video.clip_count} clips)</span>
-                    </div>
-                    <button class="btn-icon-compact btn-danger" onclick="event.stopPropagation(); deleteVideo(${video.id}, '${video.name}')" title="Eliminar video de BD (clips se borran del disco)">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-                <div class="tree-children" id="video-${video.id}"></div>
-            `;
-        });
+        // Guardar los videos para poder reordenarlos
+        if (!window.folderVideosData) window.folderVideosData = {};
+        window.folderVideosData[folderId] = data.videos;
         
-        container.innerHTML = html;
+        // Renderizar los videos con controles de ordenamiento
+        renderVideosWithSort(folderId, container, 'name-asc');
         
     } catch (error) {
         console.error('Error cargando videos:', error);
         container.innerHTML = '<div class="error-state">Error al cargar videos</div>';
     }
 }
+
+// Función para renderizar videos con ordenamiento
+function renderVideosWithSort(folderId, container, sortBy = 'name-asc') {
+    const videos = window.folderVideosData[folderId];
+    if (!videos || videos.length === 0) return;
+    
+    // Ordenar videos según criterio
+    let sortedVideos = [...videos];
+    
+    switch(sortBy) {
+        case 'name-asc':
+            sortedVideos.sort((a, b) => a.name.localeCompare(b.name));
+            break;
+        case 'name-desc':
+            sortedVideos.sort((a, b) => b.name.localeCompare(a.name));
+            break;
+        case 'clips-asc':
+            sortedVideos.sort((a, b) => a.clip_count - b.clip_count);
+            break;
+        case 'clips-desc':
+            sortedVideos.sort((a, b) => b.clip_count - a.clip_count);
+            break;
+    }
+    
+    // Construir HTML con controles de ordenamiento
+    let html = `
+        <div class="videos-sort-controls" style="margin-left: 30px; margin-bottom: 10px; padding: 8px; background: #f0f4f8; border-radius: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 0.85rem; color: #666; font-weight: 600;">
+                <i class="fas fa-sort"></i> Ordenar videos:
+            </span>
+            <select onchange="renderVideosWithSort(${folderId}, document.getElementById('folder-${folderId}'), this.value)" 
+                    style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 0.85rem; cursor: pointer;">
+                <option value="name-asc" ${sortBy === 'name-asc' ? 'selected' : ''}>📝 Nombre (A-Z)</option>
+                <option value="name-desc" ${sortBy === 'name-desc' ? 'selected' : ''}>📝 Nombre (Z-A)</option>
+                <option value="clips-desc" ${sortBy === 'clips-desc' ? 'selected' : ''}>🎬 Más clips</option>
+                <option value="clips-asc" ${sortBy === 'clips-asc' ? 'selected' : ''}>🎬 Menos clips</option>
+            </select>
+            <span style="font-size: 0.8rem; color: #999; margin-left: auto;">
+                ${sortedVideos.length} video${sortedVideos.length !== 1 ? 's' : ''}
+            </span>
+        </div>
+    `;
+    
+    sortedVideos.forEach(video => {
+        html += `
+            <div class="tree-item-container">
+                <div class="tree-item" onclick="toggleVideo(${video.id}, this)">
+                    <span class="expand-icon">▶</span>
+                    <i class="fas fa-file-video item-icon"></i>
+                    <span>${video.name} (${video.clip_count} clips)</span>
+                </div>
+                <button class="btn-icon-compact btn-danger" onclick="event.stopPropagation(); deleteVideo(${video.id}, '${video.name.replace(/'/g, "\\'")}' )" title="Eliminar video de BD (clips se borran del disco)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="tree-children" id="video-${video.id}"></div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Hacer la función global para que el select pueda llamarla
+window.renderVideosWithSort = renderVideosWithSort;
 
 // Toggle de videos en TreeView (mostrar clips)
 async function toggleVideo(videoId, element) {
@@ -440,31 +501,86 @@ async function loadClipsForVideo(videoId, container) {
             return;
         }
         
-        let html = '';
-        data.clips.forEach(clip => {
-            const objectInfo = clip.object_type ? `${clip.object_type}` : 'Sin clasificar';
-            const colorInfo = clip.object_color ? ` (${clip.object_color})` : '';
-            
-            html += `
-                <div class="tree-item-container clip-container">
-                    <div class="tree-item tree-item-clip" onclick="showClipDetails(${clip.id})">
-                        <i class="fas fa-film item-icon" style="color: var(--success-color);"></i>
-                        <span class="clip-text">${clip.event_date || clip.timestamp} - ${objectInfo}${colorInfo}</span>
-                    </div>
-                    <button class="btn-icon-compact btn-danger" onclick="event.stopPropagation(); deleteClip(${clip.id}, true)" title="Eliminar clip">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `;
-        });
+        // Guardar los clips para poder reordenarlos
+        if (!window.videoClipsData) window.videoClipsData = {};
+        window.videoClipsData[videoId] = data.clips;
         
-        container.innerHTML = html;
+        // Renderizar los clips con controles de ordenamiento
+        renderClipsWithSort(videoId, container, 'date-desc');
         
     } catch (error) {
         console.error('Error cargando clips:', error);
         container.innerHTML = '<div class="error-state">Error al cargar clips</div>';
     }
 }
+
+// Función para renderizar clips con ordenamiento
+function renderClipsWithSort(videoId, container, sortBy = 'date-desc') {
+    const clips = window.videoClipsData[videoId];
+    if (!clips || clips.length === 0) return;
+    
+    // Ordenar clips según criterio
+    let sortedClips = [...clips];
+    
+    switch(sortBy) {
+        case 'date-asc':
+            sortedClips.sort((a, b) => new Date(a.event_date || a.timestamp) - new Date(b.event_date || b.timestamp));
+            break;
+        case 'date-desc':
+            sortedClips.sort((a, b) => new Date(b.event_date || b.timestamp) - new Date(a.event_date || a.timestamp));
+            break;
+        case 'name-asc':
+            sortedClips.sort((a, b) => (a.object_type || '').localeCompare(b.object_type || ''));
+            break;
+        case 'name-desc':
+            sortedClips.sort((a, b) => (b.object_type || '').localeCompare(a.object_type || ''));
+            break;
+        case 'video-name':
+            // Ya están agrupados por video, este orden es el por defecto
+            break;
+    }
+    
+    // Construir HTML con controles de ordenamiento
+    let html = `
+        <div class="clips-sort-controls" style="margin-left: 60px; margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 0.85rem; color: #666; font-weight: 600;">
+                <i class="fas fa-sort"></i> Ordenar:
+            </span>
+            <select onchange="renderClipsWithSort(${videoId}, document.getElementById('video-${videoId}'), this.value)" 
+                    style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 0.85rem; cursor: pointer;">
+                <option value="date-desc" ${sortBy === 'date-desc' ? 'selected' : ''}>📅 Fecha (Más reciente)</option>
+                <option value="date-asc" ${sortBy === 'date-asc' ? 'selected' : ''}>📅 Fecha (Más antigua)</option>
+                <option value="name-asc" ${sortBy === 'name-asc' ? 'selected' : ''}>🏷️ Objeto (A-Z)</option>
+                <option value="name-desc" ${sortBy === 'name-desc' ? 'selected' : ''}>🏷️ Objeto (Z-A)</option>
+            </select>
+            <span style="font-size: 0.8rem; color: #999; margin-left: auto;">
+                ${sortedClips.length} clip${sortedClips.length !== 1 ? 's' : ''}
+            </span>
+        </div>
+    `;
+    
+    sortedClips.forEach(clip => {
+        const objectInfo = clip.object_type ? `${clip.object_type}` : 'Sin clasificar';
+        const colorInfo = clip.object_color ? ` (${clip.object_color})` : '';
+        
+        html += `
+            <div class="tree-item-container clip-container">
+                <div class="tree-item tree-item-clip" onclick="showClipDetails(${clip.id})">
+                    <i class="fas fa-film item-icon" style="color: var(--success-color);"></i>
+                    <span class="clip-text">${clip.event_date || clip.timestamp} - ${objectInfo}${colorInfo}</span>
+                </div>
+                <button class="btn-icon-compact btn-danger" onclick="event.stopPropagation(); deleteClip(${clip.id}, true)" title="Eliminar clip">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Hacer la función global para que el select pueda llamarla
+window.renderClipsWithSort = renderClipsWithSort;
 
 // Mostrar detalles de un clip
 async function showClipDetails(clipId) {
@@ -2318,6 +2434,24 @@ function showROIConfigView() {
     
     const content = `
         <div class="roi-config-container">
+            <!-- Instrucciones de funcionamiento -->
+            <div style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                <div style="display: flex; align-items: flex-start; gap: 16px;">
+                    <span style="font-size: 2.5em;">ℹ️</span>
+                    <div style="flex: 1;">
+                        <h3 style="margin: 0; color: #fff; font-size: 1.3em; font-weight: 600;">¿Cómo funciona la Zona de Hora?</h3>
+                        <p style="margin: 12px 0 0 0; color: #fff; opacity: 0.95; font-size: 1em; line-height: 1.6;">
+                            <strong>1. Sube un video:</strong> Selecciona cualquier video de tu cámara para usar como referencia.<br>
+                            <strong>2. Dibuja el área:</strong> Arrastra el ratón sobre la imagen para marcar <strong>dónde aparece la fecha/hora</strong> en tus videos.<br>
+                            <strong>3. Guarda:</strong> El sistema usará esta zona para extraer automáticamente la fecha y hora real de cada evento detectado.<br><br>
+                            <span style="background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 4px;">
+                                💡 <strong>Importante:</strong> Esta configuración se aplica a todos los videos de la misma cámara. Solo necesitas configurarla una vez.
+                            </span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Layout de una sola columna -->
             <div class="roi-single-column">
                 <!-- Área de carga de video -->
@@ -2413,34 +2547,49 @@ function showAdvancedConfigView() {
             <div class="config-card">
                 <h2><i class="fas fa-cog"></i> Parámetros de Detección de Movimiento</h2>
                 <p class="config-description">
-                    Ajusta los parámetros para optimizar la detección según tus necesidades
+                    Ajusta los parámetros para optimizar la detección según tus necesidades. Valores más bajos = mayor sensibilidad.
                 </p>
                 
                 <div class="advanced-settings">
                     <div class="setting-group">
-                        <label>Umbral de Porcentaje de Cambio:</label>
+                        <label><i class="fas fa-percentage"></i> Umbral de Porcentaje de Cambio:</label>
                         <input type="number" id="thresholdPercentage" value="0.5" step="0.1" min="0.1" max="10" class="form-control">
-                        <small>Porcentaje mínimo de cambio en la imagen para detectar movimiento</small>
+                        <small><strong>¿Qué es?</strong> Porcentaje mínimo de píxeles que deben cambiar en la imagen para considerar que hay movimiento.</small>
+                        <small style="display: block; margin-top: 5px; color: #3B82F6;">
+                            <i class="fas fa-lightbulb"></i> <strong>Recomendación:</strong> 0.5% para detección normal | 0.3% para alta sensibilidad | 1.0% para ignorar movimientos leves
+                        </small>
                     </div>
                     
                     <div class="setting-group">
-                        <label>Umbral de Varianza:</label>
+                        <label><i class="fas fa-adjust"></i> Umbral de Varianza:</label>
                         <input type="number" id="varThreshold" value="16" step="1" min="1" max="100" class="form-control">
-                        <small>Sensibilidad del algoritmo de sustracción de fondo</small>
+                        <small><strong>¿Qué es?</strong> Sensibilidad del algoritmo para distinguir entre fondo y movimiento. Controla cuánto debe diferir un píxel del fondo para considerarse "en movimiento".</small>
+                        <small style="display: block; margin-top: 5px; color: #3B82F6;">
+                            <i class="fas fa-lightbulb"></i> <strong>Recomendación:</strong> 16 para detección estándar | 8-12 para alta sensibilidad | 25-40 para ignorar cambios de luz
+                        </small>
                     </div>
                     
                     <div class="setting-group">
-                        <label>Tiempo de Enfriamiento (ms):</label>
-                        <input type="number" id="cooldownMs" value="8000" step="1000" min="1000" max="60000" class="form-control">
-                        <small>Tiempo mínimo entre detecciones consecutivas</small>
+                        <label><i class="fas fa-clock"></i> Tiempo de Enfriamiento:</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="number" id="cooldownMs" value="8000" step="1000" min="1000" max="60000" class="form-control" style="flex: 1;" oninput="updateCooldownDisplay(this.value)">
+                            <span id="cooldownSeconds" style="min-width: 80px; font-weight: bold; color: #3B82F6;">8 segundos</span>
+                        </div>
+                        <small><strong>¿Qué es?</strong> Tiempo mínimo que debe pasar entre dos detecciones consecutivas. Evita crear múltiples clips para el mismo evento.</small>
+                        <small style="display: block; margin-top: 5px; color: #3B82F6;">
+                            <i class="fas fa-lightbulb"></i> <strong>Recomendación:</strong> 8 seg (8000ms) para eventos normales | 3-5 seg para movimientos rápidos | 10-15 seg para eventos largos
+                        </small>
                     </div>
                     
                     <div class="setting-group" id="localFolderSettingGroup" style="display:none">
                         <label>
                             <input type="checkbox" id="duplicateFiles" checked>
-                            Duplicar archivos al seleccionar carpeta local
+                            <i class="fas fa-copy"></i> Duplicar archivos al seleccionar carpeta local
                         </label>
-                        <small>Si está desactivado, los videos se analizarán desde su ubicación original sin copiarlos</small>
+                        <small><strong>¿Qué es?</strong> Cuando está activado, los videos se copian a la carpeta de trabajo antes de analizarse. Cuando está desactivado, se analizan directamente desde su ubicación original.</small>
+                        <small style="display: block; margin-top: 5px; color: #3B82F6;">
+                            <i class="fas fa-lightbulb"></i> <strong>Nota:</strong> Desactivar ahorra espacio en disco, pero requiere mantener los videos en su ubicación original.
+                        </small>
                     </div>
                 </div>
                 
@@ -4067,22 +4216,25 @@ function syncROICheckboxesFromUpload() {
     if (generateClipsProcessing) {
         let valueToUse = true; // Default
         
-        if (generateClipsSource) {
-            // Hay un checkbox visible, usar su valor
+        // PRIORIDAD 1: Usar sessionStorage si existe (estado más reciente)
+        const savedState = sessionStorage.getItem('processingOptions.generateClips');
+        if (savedState !== null) {
+            valueToUse = savedState === 'true';
+            console.log('📂 Usando valor de sessionStorage:', valueToUse);
+        } 
+        // PRIORIDAD 2: Usar checkbox visible de otra pestaña
+        else if (generateClipsSource) {
             valueToUse = generateClipsSource.checked;
             console.log('✅ Usando valor del checkbox:', valueToUse);
-        } else {
-            // No hay checkbox visible, buscar en sessionStorage
-            const savedState = sessionStorage.getItem('processingOptions.generateClips');
-            if (savedState !== null) {
-                valueToUse = savedState === 'true';
-                console.log('📂 Usando valor de sessionStorage:', valueToUse);
-            } else if (window.lastProcessingOptions && window.lastProcessingOptions.generateClips !== undefined) {
-                valueToUse = window.lastProcessingOptions.generateClips;
-                console.log('💾 Usando valor de variable global:', valueToUse);
-            } else {
-                console.log('⚠️ Usando valor por defecto:', valueToUse);
-            }
+        } 
+        // PRIORIDAD 3: Usar variable global
+        else if (window.lastProcessingOptions && window.lastProcessingOptions.generateClips !== undefined) {
+            valueToUse = window.lastProcessingOptions.generateClips;
+            console.log('💾 Usando valor de variable global:', valueToUse);
+        } 
+        // PRIORIDAD 4: Valor por defecto
+        else {
+            console.log('⚠️ Usando valor por defecto:', valueToUse);
         }
         
         generateClipsProcessing.checked = valueToUse;
@@ -4095,28 +4247,44 @@ function syncROICheckboxesFromUpload() {
     if (useAIProcessing) {
         let valueToUse = true; // Default
         
-        if (useAISource) {
-            // Hay un checkbox visible, usar su valor
+        // PRIORIDAD 1: Usar sessionStorage si existe (estado más reciente)
+        const savedState = sessionStorage.getItem('processingOptions.useAI');
+        if (savedState !== null) {
+            valueToUse = savedState === 'true';
+            console.log('📂 Usando valor de sessionStorage:', valueToUse);
+        } 
+        // PRIORIDAD 2: Usar checkbox visible de otra pestaña
+        else if (useAISource) {
             valueToUse = useAISource.checked;
             console.log('✅ Usando valor del checkbox:', valueToUse);
-        } else {
-            // No hay checkbox visible, buscar en sessionStorage
-            const savedState = sessionStorage.getItem('processingOptions.useAI');
-            if (savedState !== null) {
-                valueToUse = savedState === 'true';
-                console.log('📂 Usando valor de sessionStorage:', valueToUse);
-            } else if (window.lastProcessingOptions && window.lastProcessingOptions.useAI !== undefined) {
-                valueToUse = window.lastProcessingOptions.useAI;
-                console.log('💾 Usando valor de variable global:', valueToUse);
-            } else {
-                console.log('⚠️ Usando valor por defecto:', valueToUse);
-            }
+        } 
+        // PRIORIDAD 3: Usar variable global
+        else if (window.lastProcessingOptions && window.lastProcessingOptions.useAI !== undefined) {
+            valueToUse = window.lastProcessingOptions.useAI;
+            console.log('💾 Usando valor de variable global:', valueToUse);
+        } 
+        // PRIORIDAD 4: Valor por defecto
+        else {
+            console.log('⚠️ Usando valor por defecto:', valueToUse);
         }
         
         useAIProcessing.checked = valueToUse;
         console.log('✅ processingUseAI sincronizado a:', useAIProcessing.checked);
     } else {
         console.warn('⚠️ processingUseAI no existe');
+    }
+    
+    // 🔥 CRÍTICO: Forzar la dependencia IA <- Clips después de sincronizar
+    if (generateClipsProcessing && useAIProcessing) {
+        // Si Clips está desactivado, FORZAR que IA también esté desactivado y disabled
+        if (!generateClipsProcessing.checked) {
+            useAIProcessing.checked = false;
+            useAIProcessing.disabled = true;
+            console.log('🚫 IA forzado a desactivado porque Clips está desactivado');
+        } else {
+            useAIProcessing.disabled = false;
+            console.log('✅ IA habilitado porque Clips está activado');
+        }
     }
 }
 
@@ -4730,12 +4898,16 @@ async function loadAdvancedConfig() {
             document.getElementById('thresholdPercentage').value = data.config.threshold_percentage;
             document.getElementById('varThreshold').value = data.config.var_threshold;
             document.getElementById('cooldownMs').value = data.config.cooldown_ms;
+            // Actualizar display de segundos
+            setTimeout(() => updateCooldownDisplay(data.config.cooldown_ms), 100);
         } else {
             // Valores por defecto si no hay configuración en el servidor
             console.log('� Usando configuración por defecto');
             document.getElementById('thresholdPercentage').value = 1.0;
             document.getElementById('varThreshold').value = 16;
             document.getElementById('cooldownMs').value = 2000;
+            // Actualizar display de segundos
+            setTimeout(() => updateCooldownDisplay(2000), 100);
         }
         
         // Cargar preferencia de carpeta local (solo en Electron) - esto se mantiene en localStorage
@@ -4753,6 +4925,9 @@ async function loadAdvancedConfig() {
         document.getElementById('thresholdPercentage').value = 1.0;
         document.getElementById('varThreshold').value = 16;
         document.getElementById('cooldownMs').value = 2000;
+        if (typeof window.updateCooldownDisplay === 'function') {
+            window.updateCooldownDisplay(2000);
+        }
     }
 }
 

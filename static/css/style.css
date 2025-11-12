@@ -21,7 +21,7 @@
     /* Estilos */
     --border-radius: 8px;
     --box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    --sidebar-width: 280px;
+    --sidebar-width: 350px;
     
     /* Fuentes exactas */
     --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -40,7 +40,87 @@ body {
     line-height: 1.6;
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
+    overflow: hidden;
+}
+
+/* ========================================
+   BARRA DE TÍTULO PERSONALIZADA (ELECTRON)
+   ======================================== */
+.custom-titlebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    background: var(--primary-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10000;
+    user-select: none;
+    -webkit-user-select: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.titlebar-drag-region {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    height: 100%;
+    padding: 0 12px;
+    -webkit-app-region: drag;
+}
+
+.titlebar-icon {
+    color: var(--secondary-color);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+
+.titlebar-title {
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+.titlebar-controls {
+    display: flex;
+    height: 100%;
+    -webkit-app-region: no-drag;
+}
+
+.titlebar-button {
+    width: 46px;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease;
+}
+
+.titlebar-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.titlebar-button:active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.titlebar-button.titlebar-close:hover {
+    background: #EF4444;
+    color: white;
+}
+
+.titlebar-button.titlebar-close:active {
+    background: #DC2626;
 }
 
 /* Layout principal con sidebar (como la app de escritorio) */
@@ -48,6 +128,7 @@ body {
     display: flex;
     height: 100vh;
     flex-direction: row;
+    overflow: hidden;
 }
 
 /* Sidebar izquierdo (profesional y serio) */
@@ -60,26 +141,31 @@ body {
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
     position: fixed;
     left: 0;
-    top: 0;
-    height: 100vh;
+    top: 32px;
+    height: calc(100vh - 32px);
     z-index: 1000;
     overflow-y: auto;
     border-right: 1px solid var(--border-color);
 }
 
 .sidebar-header {
-    background: var(--primary-color);
-    padding: 24px 20px;
+    background: linear-gradient(135deg, var(--primary-color) 0%, #0F172A 100%);
+    padding: 28px 30px 24px 30px;
     text-align: center;
     color: white;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .sidebar-header h2 {
-    font-size: 1.2rem;
+    font-size: 1.35rem;
     margin: 0;
-    font-weight: 600;
-    letter-spacing: 0.3px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: visible;
 }
 
 /* Contenido del sidebar */
@@ -204,21 +290,30 @@ body {
 .content-area {
     flex: 1;
     margin-left: var(--sidebar-width);
+    padding-top: 32px;
     display: flex;
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    box-sizing: border-box;
+    background-color: #ffffff;
 }
 
 /* Barra superior */
 .top-bar {
-    background: white;
-    padding: 16px 30px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    padding: 18px 30px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 2px solid var(--secondary-color);
+    z-index: 100;
+}
+
+.top-bar-left {
+    display: flex;
+    align-items: center;
 }
 
 .top-bar h2 {
@@ -229,20 +324,24 @@ body {
     align-items: center;
     gap: 10px;
     font-weight: 600;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .top-bar-actions {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 12px;
 }
 
 .btn-top-bar {
-    background: var(--secondary-color);
+    background: linear-gradient(135deg, var(--secondary-color) 0%, #2563EB 100%);
     color: white;
     border: none;
-    padding: 9px 18px;
-    border-radius: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
     cursor: pointer;
     font-family: var(--font-family);
     font-size: 0.9rem;
@@ -250,15 +349,18 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
 }
 
 .btn-top-bar:hover {
-    background: #2563EB;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
 }
 
 .btn-top-bar:active {
-    transform: scale(0.98);
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
 }
 
 /* Panel de contenido principal */
@@ -1775,8 +1877,8 @@ body {
 }
 
 .file-item:hover {
-    transform: translateX(5px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
 }
 
 .file-item i {
