@@ -10,6 +10,11 @@ contextBridge.exposeInMainWorld('electron', {
   selectFiles: () => ipcRenderer.invoke('select-files'),
   getFolderInfo: (path) => ipcRenderer.invoke('get-folder-info', path),
   
+  // Controles de ventana personalizados
+  windowMinimize: () => ipcRenderer.send('window-minimize'),
+  windowMaximize: () => ipcRenderer.send('window-maximize'),
+  windowClose: () => ipcRenderer.send('window-close'),
+  
   // Indicador de que estamos en Electron (no navegador)
   isElectron: true
 });
