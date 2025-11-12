@@ -4719,51 +4719,90 @@ function cancelROIProcessing() {
     window.location.href = '/';
 }
 
-function loadAdvancedConfig() {
-    const config = JSON.parse(localStorage.getItem('advancedConfig') || '{"threshold":0.5,"variance":16,"cooldown":8000,"duplicateFiles":true}');
-    document.getElementById('thresholdPercentage').value = config.threshold;
-    document.getElementById('varThreshold').value = config.variance;
-    document.getElementById('cooldownMs').value = config.cooldown;
-    
-    // Cargar preferencia de carpeta local (solo en Electron)
-    console.log('📋 Cargando configuración avanzada...', { isElectronApp, config });
-    if (isElectronApp) {
-        const duplicateFilesCheckbox = document.getElementById('duplicateFiles');
-        if (duplicateFilesCheckbox) {
-            duplicateFilesCheckbox.checked = config.duplicateFiles !== false; // Por defecto true
-            console.log('✅ Checkbox de duplicar archivos cargado:', duplicateFilesCheckbox.checked);
+async function loadAdvancedConfig() {
+    try {
+        // 🔥 CARGAR CONFIGURACIÓN DESDE EL SERVIDOR (BD)
+        const response = await fetch(buildApiUrl('/api/config/motion-detection'));
+        const data = await response.json();
+        
+        if (data.success && data.config) {
+            console.log('✅ Configuración cargada desde el servidor:', data.config);
+            document.getElementById('thresholdPercentage').value = data.config.threshold_percentage;
+            document.getElementById('varThreshold').value = data.config.var_threshold;
+            document.getElementById('cooldownMs').value = data.config.cooldown_ms;
         } else {
-            console.warn('⚠️ No se encontró el checkbox duplicateFiles');
+            // Valores por defecto si no hay configuración en el servidor
+            console.log('� Usando configuración por defecto');
+            document.getElementById('thresholdPercentage').value = 1.0;
+            document.getElementById('varThreshold').value = 16;
+            document.getElementById('cooldownMs').value = 2000;
         }
+        
+        // Cargar preferencia de carpeta local (solo en Electron) - esto se mantiene en localStorage
+        if (isElectronApp) {
+            const localConfig = JSON.parse(localStorage.getItem('advancedConfig') || '{"duplicateFiles":true}');
+            const duplicateFilesCheckbox = document.getElementById('duplicateFiles');
+            if (duplicateFilesCheckbox) {
+                duplicateFilesCheckbox.checked = localConfig.duplicateFiles !== false;
+                console.log('✅ Checkbox de duplicar archivos cargado:', duplicateFilesCheckbox.checked);
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error al cargar configuración desde servidor:', error);
+        // Fallback a valores por defecto
+        document.getElementById('thresholdPercentage').value = 1.0;
+        document.getElementById('varThreshold').value = 16;
+        document.getElementById('cooldownMs').value = 2000;
     }
 }
 
-function saveAdvancedConfig() {
+async function saveAdvancedConfig() {
     const config = {
-        threshold: parseFloat(document.getElementById('thresholdPercentage').value),
-        variance: parseInt(document.getElementById('varThreshold').value),
-        cooldown: parseInt(document.getElementById('cooldownMs').value)
+        threshold_percentage: parseFloat(document.getElementById('thresholdPercentage').value),
+        var_threshold: parseInt(document.getElementById('varThreshold').value),
+        cooldown_ms: parseInt(document.getElementById('cooldownMs').value)
     };
     
-    // Guardar preferencia de carpeta local (solo en Electron)
+    try {
+        // 🔥 GUARDAR CONFIGURACIÓN EN EL SERVIDOR (BD)
+        const response = await fetch(buildApiUrl('/api/config/motion-detection'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('✅ Configuración guardada en el servidor:', data.config);
+            showNotification('✓ Configuración guardada correctamente', 'success');
+        } else {
+            console.error('❌ Error al guardar configuración:', data.error);
+            showNotification('✗ Error al guardar configuración', 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error al guardar configuración en servidor:', error);
+        showNotification('✗ Error al guardar configuración', 'error');
+    }
+    
+    // Guardar preferencia de carpeta local (solo en Electron) - esto se mantiene en localStorage
     if (isElectronApp) {
         const duplicateFilesCheckbox = document.getElementById('duplicateFiles');
         if (duplicateFilesCheckbox) {
-            config.duplicateFiles = duplicateFilesCheckbox.checked;
-            console.log('💾 Guardando preferencia de duplicar archivos:', config.duplicateFiles);
+            const localConfig = { duplicateFiles: duplicateFilesCheckbox.checked };
+            localStorage.setItem('advancedConfig', JSON.stringify(localConfig));
+            console.log('💾 Preferencia de duplicar archivos guardada localmente:', localConfig.duplicateFiles);
         }
     }
-    
-    localStorage.setItem('advancedConfig', JSON.stringify(config));
-    console.log('✅ Configuración guardada:', config);
-    showNotification('✓ Configuración avanzada guardada', 'success');
 }
 
 function resetAdvancedConfig() {
-    document.getElementById('thresholdPercentage').value = 0.5;
+    document.getElementById('thresholdPercentage').value = 1.0;
     document.getElementById('varThreshold').value = 16;
-    document.getElementById('cooldownMs').value = 8000;
-    saveAdvancedConfig();
+    document.getElementById('cooldownMs').value = 2000;
+    saveAdvancedConfig(); // Ahora es async pero no necesitamos esperar
 }
 
 // Cargar historial en el sidebar

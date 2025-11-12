@@ -38,26 +38,13 @@
       "!*.pyc",
       "!.git"
     ],
-    "extraResources": [
-      {
-        "from": "requirements.txt",
-        "to": "requirements.txt"
-      }
-    ],
+
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        }
-      ],
-      "icon": "electron/icon.ico"
+      "target": "nsis",
+      "publisherName": "Detector de Movimiento"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
     }
   }
 }

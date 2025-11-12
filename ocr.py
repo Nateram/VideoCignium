@@ -13,7 +13,8 @@ try:
     TKINTER_AVAILABLE = True
 except ImportError:
     TKINTER_AVAILABLE = False
-    print("⚠️ tkinter no disponible - modo web únicamente")
+    # No imprimir nada aquí para evitar problemas de codificación
+    pass
 
 # Definimos las dimensiones para mostrar la imagen en la ventana
 DISPLAY_WIDTH = 800

@@ -307,13 +307,14 @@ def insert_clip(conn, video_id, clip_filename, clip_path, event_ms, fecha_evento
             logger.error(f"Traza: {traceback.format_exc()}")
             return None
 
-def save_motion_detection_config(threshold_percentage, var_threshold, cooldown_ms):
+def save_motion_detection_config(threshold_percentage, var_threshold, cooldown_ms, db_path=None):
     """
     Guarda la configuración de detección de movimiento en la base de datos.
+    Si no se proporciona db_path, usa la BD por defecto (temporal).
     """
     with db_lock:
         try:
-            conn = create_db_connection()
+            conn = create_db_connection(db_path)
             cursor = conn.cursor()
             fecha_actualizacion = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
@@ -334,13 +335,14 @@ def save_motion_detection_config(threshold_percentage, var_threshold, cooldown_m
             logger.error(f"Error al guardar configuración: {e}")
             return False
 
-def load_motion_detection_config():
+def load_motion_detection_config(db_path=None):
     """
     Carga la configuración de detección de movimiento desde la base de datos.
     Si no existe configuración, devuelve valores por defecto.
+    Si no se proporciona db_path, usa la BD por defecto (temporal).
     """
     try:
-        conn = create_db_connection()
+        conn = create_db_connection(db_path)
         cursor = conn.cursor()
         
         # Buscar la configuración activa más reciente
