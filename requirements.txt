@@ -1,0 +1,25 @@
+# Flask y extensiones web
+Flask>=3.0.0
+flask-cors>=4.0.0
+Werkzeug>=3.0.0
+
+# Procesamiento de video e imágenes
+opencv-python>=4.8.0
+numpy>=1.24.0,<2.0.0
+Pillow>=10.0.0
+
+# OCR
+easyocr>=1.7.0
+
+# Procesamiento de datos
+pandas>=2.0.0
+
+# HTTP requests
+requests>=2.31.0
+
+# PyTorch (requerido por ultralytics y easyocr) - versión estable compatible con Python 3.11
+torch>=2.1.0
+torchvision>=0.16.0
+
+# Detección de objetos YOLO - versión compatible con Python 3.11
+ultralytics>=8.0.0

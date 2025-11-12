@@ -28,8 +28,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Buffer para logs de eventos en directo
 live_event_logs = deque(maxlen=100)
 
-# Agregar el directorio padre al path para importar módulos
-sys.path.insert(0, os.path.dirname(BASE_DIR))
+# Agregar el directorio actual al path para importar módulos
+sys.path.insert(0, BASE_DIR)
 
 import db
 import video_processing
@@ -81,16 +81,25 @@ if PREFIX:
 
 CORS(app)
 
+# ====================================================================
+# 📂 CONFIGURACIÓN DE CARPETA DE DATOS DE USUARIO
+# ====================================================================
+# Usar carpeta de datos de usuario en lugar de Program Files (permisos de escritura)
+if os.name == 'nt':  # Windows
+    USER_DATA_DIR = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'DetectorMovimiento')
+else:  # Linux/Mac
+    USER_DATA_DIR = os.path.join(os.path.expanduser('~'), '.detector_movimiento')
+
 # Configuración
 app.config['SECRET_KEY'] = 'detector-movimiento-secret-key-2025'
 app.config['MAX_CONTENT_LENGTH'] = 2000 * 1024 * 1024  # 2GB máximo (para videos grandes)
-app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'static', 'uploads')
+app.config['UPLOAD_FOLDER'] = os.path.join(USER_DATA_DIR, 'uploads')
 app.config['ALLOWED_EXTENSIONS'] = {'mp4', 'avi', 'mov', 'dav', 'mkv'}
 
 # ====================================================================
 # 📂 CONFIGURACIÓN MODO LOCAL (Sin sesiones - BD única)
 # ====================================================================
-app.config['DATA_FOLDER'] = os.path.join(BASE_DIR, 'data_local')
+app.config['DATA_FOLDER'] = os.path.join(USER_DATA_DIR, 'data_local')
 app.config['DB_PATH'] = os.path.join(app.config['DATA_FOLDER'], 'detector_movimiento.db')
 app.config['CLIPS_FOLDER'] = os.path.join(app.config['DATA_FOLDER'], 'clips_analisis')
 
@@ -109,8 +118,8 @@ MAX_WORKERS = max(2, multiprocessing.cpu_count() - 1)  # Workers para videos/cli
 # Crear carpetas necesarias
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Configurar logging - SESIÓN TEMPORAL con timestamp único
-log_folder = os.path.join(BASE_DIR, 'logs')
+# Configurar logging - SESIÓN TEMPORAL con timestamp único (usar carpeta de usuario)
+log_folder = os.path.join(USER_DATA_DIR, 'logs')
 os.makedirs(log_folder, exist_ok=True)
 
 def cleanup_old_logs():
@@ -325,8 +334,35 @@ logger.info("="*80)
 # Inicializar BD única persistente (sin sesiones)
 logger.info("📊 Inicializando base de datos única...")
 db.create_tables(app.config['DB_PATH'])
+
+# ✅ VERIFICAR que la tabla configuracion_deteccion existe (migración)
+try:
+    conn = db.create_db_connection(app.config['DB_PATH'])
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='configuracion_deteccion'")
+    if not cursor.fetchone():
+        logger.info("📝 Creando tabla configuracion_deteccion...")
+        cursor.execute("""
+            CREATE TABLE configuracion_deteccion (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                threshold_percentage REAL NOT NULL DEFAULT 1.0,
+                var_threshold INTEGER NOT NULL DEFAULT 16,
+                cooldown_ms INTEGER NOT NULL DEFAULT 2000,
+                fecha_actualizacion TEXT NOT NULL,
+                activa INTEGER NOT NULL DEFAULT 1
+            );
+        """)
+        conn.commit()
+        logger.info("✅ Tabla configuracion_deteccion creada")
+    conn.close()
+except Exception as e:
+    logger.error(f"Error al verificar tabla configuracion_deteccion: {e}")
+
 logger.info(f"   ✅ BD inicializada: {app.config['DB_PATH']}")
 logger.info("="*80)
+
+# Variable global para configuración de detección (se carga más adelante después de definir la función)
+global_motion_config = None
 
 # Variable global para tracking de progreso (ahora incluye info de sesión)
 processing_status = {
@@ -353,8 +389,61 @@ queue_lock = threading.Lock()
 # Diccionario para mantener sesiones activas {session_id: {db_path, folder_path, created_at, uploaded_videos}}
 active_sessions = {}
 
-# Variable para modo de análisis (duplicar archivos vs analizar desde ruta original)
-analyze_from_original_path = False  # Por defecto: duplicar archivos
+# ====================================================================
+# 💾 CONFIGURACIÓN PERSISTENTE (se guarda en BASE DE DATOS)
+# ====================================================================
+
+# Variable global para configuración (se carga de la BD)
+analyze_from_original_path = False
+
+def load_app_config():
+    """
+    Carga la configuración de la aplicación desde la BASE DE DATOS.
+    Incluye configuración de detección de movimiento y opciones de análisis.
+    """
+    global analyze_from_original_path
+    
+    try:
+        # Cargar configuración de detección de movimiento desde la BD PERMANENTE
+        motion_config = db.load_motion_detection_config(app.config['DB_PATH'])
+        
+        if motion_config:
+            logger.info(f"✅ Configuración de detección cargada desde BD")
+            logger.info(f"   • Threshold: {motion_config['threshold_percentage']}%")
+            logger.info(f"   • Var threshold: {motion_config['var_threshold']}")
+            logger.info(f"   • Cooldown: {motion_config['cooldown_ms']}ms")
+        else:
+            logger.info("📝 No hay configuración guardada, se usarán valores por defecto")
+            motion_config = {
+                'threshold_percentage': 1.0,
+                'var_threshold': 16,
+                'cooldown_ms': 2000,
+                'gaussian_blur': (5, 5),
+                'morph_kernel_size': (3, 3),
+                'binary_threshold': 127
+            }
+        
+        # Por ahora, analyze_from_original_path se mantiene en False por defecto
+        # En el futuro se puede añadir una tabla de configuración general
+        analyze_from_original_path = False
+        
+        return motion_config
+    
+    except Exception as e:
+        logger.error(f"❌ Error al cargar configuración: {e}")
+        return {
+            'threshold_percentage': 1.0,
+            'var_threshold': 16,
+            'cooldown_ms': 2000,
+            'gaussian_blur': (5, 5),
+            'morph_kernel_size': (3, 3),
+            'binary_threshold': 127
+        }
+
+# ✅ CARGAR CONFIGURACIÓN AL INICIAR LA APLICACIÓN
+logger.info("📋 Cargando configuración de detección...")
+global_motion_config = load_app_config()
+logger.info("="*80)
 
 def get_or_create_session():
     """Obtiene o crea una sesión activa para el usuario"""
@@ -467,15 +556,10 @@ def index():
 
 @app.route('/api/folders', methods=['GET'])
 def get_folders():
-    """Obtiene todas las carpetas analizadas de la sesión actual"""
+    """Obtiene todas las carpetas analizadas de la BD PERMANENTE"""
     try:
-        # Usar BD de sesión si existe, sino retornar vacío
-        session_db_path = processing_status.get('session_db_path')
-        
-        if not session_db_path or not os.path.exists(session_db_path):
-            return jsonify({'success': True, 'folders': []})
-        
-        conn = db.create_db_connection(session_db_path)
+        # ✅ USAR BD PERMANENTE en lugar de BD temporal de sesión
+        conn = db.create_db_connection(app.config['DB_PATH'])
         cursor = conn.cursor()
         cursor.execute("SELECT id, ruta, fecha_subida FROM carpetas ORDER BY fecha_subida DESC")
         folders = cursor.fetchall()
@@ -490,6 +574,7 @@ def get_folders():
                 'name': os.path.basename(folder[1])
             })
         
+        logger.info(f"✅ Cargadas {len(result)} carpetas de la BD permanente")
         return jsonify({'success': True, 'folders': result})
     except Exception as e:
         logger.error(f"Error al obtener carpetas: {e}")
@@ -497,15 +582,10 @@ def get_folders():
 
 @app.route('/api/folder/<int:folder_id>', methods=['GET'])
 def get_folder_details(folder_id):
-    """Obtiene detalles de una carpeta específica de la sesión actual"""
+    """Obtiene detalles de una carpeta específica de la BD PERMANENTE"""
     try:
-        # Usar BD de sesión
-        session_db_path = processing_status.get('session_db_path')
-        
-        if not session_db_path or not os.path.exists(session_db_path):
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
-        
-        conn = db.create_db_connection(session_db_path)
+        # ✅ USAR BD PERMANENTE
+        conn = db.create_db_connection(app.config['DB_PATH'])
         cursor = conn.cursor()
         
         # Obtener videos de la carpeta
@@ -537,15 +617,10 @@ def get_folder_details(folder_id):
     
 @app.route('/api/video/<int:video_id>/clips', methods=['GET'])
 def get_video_clips(video_id):
-    """Obtiene clips de un video específico de la sesión actual"""
+    """Obtiene clips de un video específico de la BD PERMANENTE"""
     try:
-        # Usar BD de sesión
-        session_db_path = processing_status.get('session_db_path')
-        
-        if not session_db_path or not os.path.exists(session_db_path):
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
-        
-        conn = db.create_db_connection(session_db_path)
+        # ✅ USAR BD PERMANENTE
+        conn = db.create_db_connection(app.config['DB_PATH'])
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -1502,6 +1577,8 @@ def config_analyze_mode():
         else:
             return jsonify({'success': False, 'error': 'Modo inválido (use: duplicate u original)'}), 400
         
+        # ℹ️ Esta configuración se mantiene solo durante la sesión actual
+        # Para hacerla persistente, se debería añadir a una tabla de configuración general
         logger.info(f"⚙️ Modo de análisis cambiado a: {'Analizar desde ruta original' if analyze_from_original_path else 'Duplicar archivos'}")
         
         return jsonify({
@@ -1513,6 +1590,64 @@ def config_analyze_mode():
         
     except Exception as e:
         logger.error(f"❌ Error al cambiar modo de análisis: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/config/motion-detection', methods=['GET', 'POST'])
+def motion_detection_config():
+    """
+    GET: Obtiene la configuración actual de detección de movimiento desde la BD
+    POST: Guarda nueva configuración de detección de movimiento en la BD
+    """
+    global global_motion_config
+    
+    if request.method == 'GET':
+        # Devolver configuración actual
+        return jsonify({
+            'success': True,
+            'config': global_motion_config
+        })
+    
+    # POST: Guardar nueva configuración
+    try:
+        data = request.json
+        
+        # Validar datos
+        threshold_percentage = float(data.get('threshold_percentage', 1.0))
+        var_threshold = int(data.get('var_threshold', 16))
+        cooldown_ms = int(data.get('cooldown_ms', 2000))
+        
+        # Guardar en BD PERMANENTE usando la función de db.py
+        success = db.save_motion_detection_config(threshold_percentage, var_threshold, cooldown_ms, app.config['DB_PATH'])
+        
+        if success:
+            # Actualizar configuración global en memoria
+            global_motion_config = {
+                'threshold_percentage': threshold_percentage,
+                'var_threshold': var_threshold,
+                'cooldown_ms': cooldown_ms,
+                'gaussian_blur': (5, 5),
+                'morph_kernel_size': (3, 3),
+                'binary_threshold': 127
+            }
+            
+            logger.info(f"✅ Configuración de detección guardada:")
+            logger.info(f"   • Threshold: {threshold_percentage}%")
+            logger.info(f"   • Var threshold: {var_threshold}")
+            logger.info(f"   • Cooldown: {cooldown_ms}ms")
+            
+            return jsonify({
+                'success': True,
+                'config': global_motion_config,
+                'message': 'Configuración guardada correctamente'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Error al guardar configuración en la base de datos'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"❌ Error al guardar configuración de detección: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/select-local-folder', methods=['POST'])
@@ -1683,15 +1818,9 @@ def process_videos():
         generate_clips = data.get('generate_clips', True)
         use_ai_analysis = data.get('use_ai_analysis', True)
         
-        # Obtener configuración de detección de movimiento (puede ser diferente para cada tarea)
-        motion_config = data.get('motion_config', {
-            'threshold_percentage': 1.0,
-            'var_threshold': 16,
-            'cooldown_ms': 2000,
-            'gaussian_blur': [5, 5],
-            'morph_kernel_size': [3, 3],
-            'binary_threshold': 127
-        })
+        # ✅ Obtener configuración de detección desde la BD (global_motion_config)
+        # Si el cliente envía configuración personalizada, se usa; sino, se usa la de la BD
+        motion_config = data.get('motion_config', global_motion_config)
         
         # ✅ Crear trabajo para la cola con configuración INDEPENDIENTE
         job = {
@@ -2057,32 +2186,8 @@ def process_single_job(job):
     main_conn = db.create_db_connection(session_db_path)
     cursor = main_conn.cursor()
     
-    # Verificar y eliminar videos duplicados ANTES de empezar
-    for video_file in video_files:
-        cursor.execute("SELECT id FROM videos WHERE nombre_archivo = ?", (video_file,))
-        existing_video = cursor.fetchone()
-        
-        if existing_video:
-            video_id_to_delete = existing_video[0]
-            logger.warning(f"⚠️ Video duplicado detectado: {video_file} (ID: {video_id_to_delete})")
-            
-            # Eliminar clips del disco
-            cursor.execute("SELECT ruta_absoluta FROM clips WHERE video_id = ?", (video_id_to_delete,))
-            clips = cursor.fetchall()
-            
-            for clip in clips:
-                clip_path = clip[0]
-                if clip_path and os.path.exists(clip_path):
-                    try:
-                        os.remove(clip_path)
-                        logger.info(f"   ✓ Clip eliminado: {os.path.basename(clip_path)}")
-                    except Exception as e:
-                        logger.error(f"   ❌ Error al eliminar clip {clip_path}: {e}")
-            
-            cursor.execute("DELETE FROM clips WHERE video_id = ?", (video_id_to_delete,))
-            cursor.execute("DELETE FROM videos WHERE id = ?", (video_id_to_delete,))
-            main_conn.commit()
-            logger.info(f"✅ Video duplicado eliminado de BD")
+    # ✅ PERMITIR VIDEOS DUPLICADOS - El mismo video se puede analizar múltiples veces
+    # (Ya no borramos análisis anteriores del mismo video)
     
     # 🎯 PROCESAR VIDEOS SECUENCIALMENTE (para evitar conflictos de archivos temp)
     logger.info(f"� Procesando {len(video_files)} videos SECUENCIALMENTE...")
@@ -3344,11 +3449,11 @@ def save_excel_data():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def cleanup_all_on_exit():
-    """Limpia TODAS las sesiones y logs antiguos al cerrar el servidor"""
+    """Limpia solo logs antiguos al cerrar - MANTIENE base de datos y uploads intactos"""
     logger.info("="*80)
-    logger.info("🛑 Cerrando servidor - Limpiando sesiones y logs antiguos...")
+    logger.info("🛑 Cerrando servidor - Limpiando solo logs antiguos...")
     
-    # Primero limpiar logs antiguos (ahora que cerramos, podemos borrarlos)
+    # Solo limpiar logs antiguos (mantener últimos 10)
     try:
         log_files = [f for f in os.listdir(log_folder) if f.startswith('session_') and f.endswith('.log')]
         if len(log_files) > 10:
@@ -3369,57 +3474,8 @@ def cleanup_all_on_exit():
     except Exception as e:
         logger.debug(f"Error al limpiar logs: {e}")
     
-    upload_folder = app.config['UPLOAD_FOLDER']
-    if not os.path.exists(upload_folder):
-        logger.info("✅ No hay sesiones que limpiar")
-        return
-    
-    cleaned_count = 0
-    
-    for item in os.listdir(upload_folder):
-        item_path = os.path.join(upload_folder, item)
-        
-        try:
-            if os.path.isdir(item_path):
-                import shutil
-                try:
-                    shutil.rmtree(item_path)
-                    logger.info(f"   ✓ Eliminado: {item}")
-                    cleaned_count += 1
-                except Exception as rmtree_e:
-                    logger.warning(f"   ⚠️ No se pudo eliminar carpeta completa {item}: {rmtree_e}")
-                    # Intentar eliminar archivos individualmente
-                    try:
-                        for root, dirs, files in os.walk(item_path, topdown=False):
-                            for file in files:
-                                try:
-                                    os.remove(os.path.join(root, file))
-                                except:
-                                    pass
-                            for dir_name in dirs:
-                                try:
-                                    os.rmdir(os.path.join(root, dir_name))
-                                except:
-                                    pass
-                        try:
-                            os.rmdir(item_path)
-                            logger.info(f"   ✓ Eliminado parcialmente: {item}")
-                            cleaned_count += 1
-                        except:
-                            logger.warning(f"   ⚠️ No se pudo eliminar completamente: {item}")
-                    except:
-                        logger.warning(f"   ❌ Error al limpiar parcialmente {item}")
-            elif os.path.isfile(item_path):
-                try:
-                    os.remove(item_path)
-                    logger.info(f"   ✓ Eliminado archivo: {item}")
-                    cleaned_count += 1
-                except Exception as file_e:
-                    logger.warning(f"   ⚠️ No se pudo eliminar archivo {item}: {file_e}")
-        except Exception as e:
-            logger.warning(f"   ⚠️ Error al limpiar {item}: {e}")
-    
-    logger.info(f"✅ Limpieza completada: {cleaned_count} elementos eliminados")
+    # ✅ YA NO BORRAMOS uploads ni base de datos - se mantienen para historial
+    logger.info("💾 Base de datos y archivos mantenidos para próxima sesión")
     logger.info("👋 Servidor cerrado correctamente")
     logger.info("="*80)
 
@@ -3434,7 +3490,7 @@ if __name__ == '__main__':
     print("🚀 Iniciando servidor Flask...")
     print("📍 Accede a la aplicación en: http://localhost:5000")
     print("⚠️  Presiona Ctrl+C para detener el servidor")
-    print("💡 Al cerrar el servidor, TODAS las sesiones se eliminarán automáticamente")
+    print("� Los datos se mantienen entre sesiones (historial persistente)")
     print("-" * 60)
     
     try:
