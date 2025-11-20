@@ -1,0 +1,803 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{amssymb} % <-- AÑADIDO PARA \checkmark
+
+% Configuración de página
+\geometry{margin=2.5cm}
+\pagestyle{fancy}
+\setlength{\headheight}{14pt} % <-- AÑADIDO PARA CORREGIR ADVERTENCIA
+\fancyhf{}
+\rhead{\thepage}
+\lhead{Guía de Usuario - Panel de Control} 
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\figurename}{Figura} % Añadido para español
+\renewcommand{\contentsname}{Tabla de Contenido} % Añadido para español
+
+% Configuración de colores
+\definecolor{primaryblue}{RGB}{52,73,94}
+\definecolor{successgreen}{RGB}{46,204,113}
+\definecolor{warningorange}{RGB}{230,126,34}
+\definecolor{dangerred}{RGB}{231,76,60}
+
+% Configuración de hipervínculos
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={Guía de Usuario - Panel de Control Análisis Video}, 
+    pdfauthor={Grupo de Ingeniería de Medios - Escuela Politécnica}
+}
+
+\begin{document}
+
+% PORTADA PERSONALIZADA
+\begin{titlepage}
+    \centering
+    
+    % Logo de la aplicación (¡ACTIVADO!)
+    \vspace{2cm}
+    \includegraphics[width=0.3\textwidth]{imagenes/logo.png} 
+    
+    \vspace{3cm}
+    
+    % Título principal
+    {\Huge\textbf{GUÍA de USUARIO}}
+    
+    \vspace{0.5cm}
+    
+    % Subtítulo
+    {\LARGE\textcolor{primaryblue}{Panel de Control: Análisis de Video}} 
+    
+    \vspace{0.3cm}
+    
+    % Línea decorativa
+    \textcolor{successgreen}{\rule{0.6\textwidth}{2pt}}
+    
+    \vspace{1cm}
+    
+    % Descripción
+    {\large Sistema Web para Análisis de Grabaciones de Seguridad}
+    
+    \vspace{0.5cm}
+    
+    {\normalsize Detección de objetos y generación de clips}
+    
+    \vfill
+    
+    % Información institucional
+    \begin{tcolorbox}[colback=primaryblue!10,colframe=primaryblue,width=0.8\textwidth,center]
+        \centering
+        \textbf{\large Grupo de Ingeniería de Medios}\\
+        \vspace{0.3cm}
+        {\Large Escuela Politécnica}\\
+        \vspace{0.2cm}
+        \textit{Desarrollo e Innovación Tecnológica}
+    \end{tcolorbox}
+    
+    \vspace{1cm}
+    
+    % Fecha y versión
+    \begin{tabular}{c}
+        {\large\textbf{Noviembre 2025}} \\ 
+        \textcolor{warningorange}{\textbf{Versión 2.0 (Web)}} 
+    \end{tabular}
+    
+    \vspace{1cm}
+    
+    % Pie de portada
+    \textcolor{gray}{\small Manual de Usuario Completo - Guía Paso a Paso}
+    
+\end{titlepage}
+
+\thispagestyle{empty}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ========================================
+% PARTE I: INTRODUCCIÓN
+% ========================================
+
+\section{Introducción}
+El \textbf{Panel de Control} es una aplicación de escritorio basada en Electron para analizar videos de seguridad, detectar movimientos y objetos, y generar clips de eventos automáticamente. Esta guía está dividida en dos secciones principales:
+
+\begin{itemize}
+    \item \textbf{Funcionamiento Básico}: Todo lo necesario para el uso diario de la aplicación.
+    \item \textbf{Funciones Avanzadas}: Herramientas de configuración, soporte técnico y opciones especiales.
+\end{itemize}
+
+\vspace{1cm}
+
+% ========================================
+% PARTE II: FUNCIONAMIENTO BÁSICO
+% ========================================
+
+\part{Funcionamiento Básico}
+
+\section{Inicio Rápido: Primeros Pasos}
+
+\subsection{Preparación Inicial}
+
+\begin{tcolorbox}[colback=primaryblue!10,colframe=primaryblue,title=Antes de comenzar]
+\begin{enumerate}
+    \item Organiza tus videos en carpetas específicas por fecha o cámara.
+    \item Verifica que los videos sean de formatos compatibles (\texttt{.mp4}, \texttt{.dav}, \texttt{.avi}).
+    \item Ten claro qué zona del video quieres analizar (puerta, calle, zona de acceso).
+\end{enumerate}
+\end{tcolorbox}
+
+% --- SECCIÓN 1: SUBIR Y ANALIZAR ---
+\section{Paso 1: Subir Videos para Análisis}
+
+% --- SECCIÓN 1: SUBIR Y ANALIZAR ---
+\section{Paso 1: Subir Videos para Análisis}
+
+La aplicación ofrece dos formas de cargar videos para análisis:
+
+\subsection{Opción A: Analizar Carpeta Completa (Recomendado)}
+Esta opción procesa todos los videos dentro de una carpeta de forma automática.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{imagenes/SubirCarpeta.png}
+    \caption{Interfaz para seleccionar una carpeta completa.}
+    \label{fig:subir-carpeta}
+\end{figure}
+
+\textbf{Pasos:}
+\begin{enumerate}
+    \item Haz clic en el botón verde \textbf{Seleccionar Carpeta}.
+    \item Navega hasta la carpeta que contiene tus videos.
+    \item Selecciona la carpeta y confirma.
+\end{enumerate}
+
+\begin{tcolorbox}[colback=successgreen!10,colframe=successgreen,title=Ventaja]
+Ideal para analizar lotes de videos de la misma cámara o del mismo día.
+\end{tcolorbox}
+
+\subsection{Opción B: Analizar Videos Individuales}
+Esta opción permite seleccionar uno o varios videos específicos.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{imagenes/SubirVideo.png}
+    \caption{Interfaz para seleccionar videos individuales.}
+    \label{fig:subir-video}
+\end{figure}
+
+\textbf{Pasos:}
+\begin{enumerate}
+    \item Haz clic en el botón naranja \textbf{Seleccionar Videos}.
+    \item Selecciona uno o varios archivos de video.
+    \item Confirma la selección.
+\end{enumerate}
+
+\section{Paso 2: Configurar Área de Análisis (ROI)}
+
+Tras cargar los videos, debes definir la \textbf{Región de Interés (ROI)}, que es el área específica del video donde se detectará movimiento.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/SeleccionRoi.png}
+    \caption{Selección de la Región de Interés arrastrando el ratón sobre el fotograma.}
+    \label{fig:roi}
+\end{figure}
+
+\textbf{Pasos:}
+\begin{enumerate}
+    \item Se mostrará un fotograma del primer video.
+    \item \textbf{Arrastra con el ratón} para dibujar un rectángulo verde sobre la zona que deseas analizar.
+    \item Las coordenadas (X, Y, Ancho, Alto) se actualizarán automáticamente.
+    \item Opcionalmente, activa \textbf{Análisis con IA} para detección de objetos específicos.
+    \item Haz clic en \textbf{Iniciar Análisis}.
+\end{enumerate}
+
+\begin{tcolorbox}[colback=warningorange!10,colframe=warningorange,title=Consejos Importantes]
+\begin{itemize}
+    \item Selecciona \textbf{solo la zona relevante} (ej: puerta, pasillo, calle específica).
+    \item Evita incluir áreas con movimiento constante no deseado (árboles, banderas).
+    \item Un ROI más pequeño = menos falsos positivos + análisis más rápido.
+\end{itemize}
+\end{tcolorbox}
+
+\section{Paso 3: Monitorear el Análisis}
+
+Una vez iniciado el análisis, la aplicación te redirige automáticamente al panel de estado.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{imagenes/EstadoAnalisis.png}
+    \caption{Panel de estado mostrando el progreso en tiempo real.}
+    \label{fig:estado-analisis}
+\end{figure}
+
+\textbf{Información mostrada:}
+\begin{itemize}
+    \item \textbf{Videos Procesados}: Cantidad de videos analizados.
+    \item \textbf{Movimientos Detectados}: Total de eventos encontrados.
+    \item \textbf{Clips Generados}: Número de clips de 16 segundos creados.
+    \item \textbf{Objetos Detectados}: Si usaste IA, muestra tipos de objetos (persona, coche, etc.).
+\end{itemize}
+
+\begin{tcolorbox}[colback=primaryblue!10,colframe=primaryblue,title=Nota]
+El análisis puede tardar varios minutos dependiendo de la cantidad y duración de los videos.
+\end{tcolorbox}
+
+\section{Paso 4: Explorar Resultados}
+
+Una vez completado el análisis, puedes revisar todos los clips generados en la sección \textbf{Carpetas y Videos}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/CarpetasVideos.png}
+    \caption{Explorador jerárquico de sesiones, videos y clips detectados.}
+    \label{fig:explorar-videos}
+\end{figure}
+
+\textbf{Estructura del explorador:}
+\begin{itemize}
+    \item \textbf{Sesiones}: Carpeta raíz con fecha y hora de análisis.
+    \item \textbf{Videos}: Cada video analizado dentro de la sesión.
+    \item \textbf{Clips}: Eventos detectados con fecha/hora y tipo de objeto.
+\end{itemize}
+
+\subsection{Ver Detalles de un Clip}
+
+Al hacer clic en cualquier clip, se abre una ventana modal con toda la información.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/DetallesClips.png}
+    \caption{Ventana de detalles con reproductor y opciones de edición.}
+    \label{fig:detalles-clip}
+\end{figure}
+
+\textbf{Opciones disponibles:}
+\begin{enumerate}
+    \item \textbf{Reproducir}: Ver el clip de 16 segundos del evento.
+    \item \textbf{Editar}: Modificar el tipo de objeto o color haciendo clic en el icono del lápiz \includegraphics[height=10pt]{imagenes/icono-editar.png}.
+    \item \textbf{Descargar}: Guardar el clip en tu computadora.
+    \item \textbf{Eliminar}: Borrar el clip si no es relevante.
+\end{enumerate}
+
+\section{Paso 5: Exportar Reporte Excel}
+
+Para generar un informe completo de todos los eventos, ve a la sección \textbf{Excel de Sesión}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/Excel.png}
+    \caption{Tabla resumen exportable a formato Excel.}
+    \label{fig:excel}
+\end{figure}
+
+\textbf{Columnas del reporte:}
+\begin{longtable}{|p{4cm}|p{10cm}|}
+\hline
+\textbf{Campo} & \textbf{Descripción} \\ \hline
+\endhead
+CARPETA & Sesión de análisis (nombre con fecha/hora). \\ \hline
+VIDEO DE ORIGEN & Archivo original analizado. \\ \hline
+FECHA Y HORA & Timestamp exacto del evento detectado. \\ \hline
+OBJETO DETECTADO & Tipo: persona, coche, camión, moto, otro. \\ \hline
+COLOR & Color predominante del objeto. \\ \hline
+POSICIÓN DEL EVENTO & Tiempo (segundos) dentro del video original. \\ \hline
+\end{longtable}
+
+\textbf{Acciones:}
+\begin{itemize}
+    \item \textbf{Guardar}: Actualiza cambios realizados en la tabla.
+    \item \textbf{Descargar}: Exporta el reporte completo en formato Excel (.xlsx).
+\end{itemize}
+
+% ========================================
+% PARTE III: FUNCIONES AVANZADAS
+% ========================================
+
+\part{Funciones Avanzadas}
+
+\section{Configuración de Zona Horaria}
+
+Esta configuración es \textbf{obligatoria} si deseas que el sistema extraiga automáticamente la fecha y hora de los clips. Solo necesita configurarse \textbf{una vez} por tipo de cámara.
+
+\subsection{¿Cuándo configurar la zona horaria?}
+
+\begin{tcolorbox}[colback=warningorange!10,colframe=warningorange,title=Importante]
+Configura la zona horaria si:
+\begin{itemize}
+    \item Tus videos muestran la fecha/hora en pantalla.
+    \item Cambias de cámara o sistema de grabación.
+    \item La posición de la hora varía entre videos.
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Paso 1: Subir Video de Referencia}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{imagenes/ConfigurarHora_Paso1.png}
+    \caption{Cargar un video de muestra para configuración.}
+    \label{fig:zona-hora-1}
+\end{figure}
+
+\begin{enumerate}
+    \item Ve a \textbf{CONFIGURACIÓN} $\rightarrow$ \textbf{Configurar Zona Hora}.
+    \item Haz clic en \textbf{Seleccionar Video}.
+    \item Elige un video representativo del lote a analizar.
+\end{enumerate}
+
+\subsection{Paso 2: Marcar la Zona de Timestamp}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/ConfigurarHora_Paso2.png}
+    \caption{Dibujar rectángulo sobre el área de fecha/hora.}
+    \label{fig:zona-hora-2}
+\end{figure}
+
+\begin{enumerate}
+    \item Se mostrará un fotograma del video.
+    \item \textbf{Arrastra el ratón} para dibujar un rectángulo azul sobre la fecha/hora.
+    \item Asegúrate de incluir todos los dígitos de fecha y hora.
+    \item Haz clic en \textbf{Guardar Configuración}.
+\end{enumerate}
+
+\begin{tcolorbox}[colback=successgreen!10,colframe=successgreen,title=Resultado]
+Una vez guardada, esta configuración se aplicará automáticamente a todos los análisis futuros hasta que la cambies.
+\end{tcolorbox}
+
+\section{Configuración Avanzada de Detección}
+
+Esta sección permite ajustar parámetros técnicos del algoritmo de detección de movimiento.
+
+\begin{tcolorbox}[colback=dangerred!10,colframe=dangerred,title=¡Atención!]
+\textbf{NO modifiques estos valores} a menos que sepas lo que haces. Los valores por defecto están optimizados para detección de personas y vehículos.
+\end{tcolorbox}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{imagenes/ConfiguraccionAvanzada.png}
+    \caption{Panel de parámetros avanzados de detección.}
+    \label{fig:config-avanzada}
+\end{figure}
+
+\subsection{Parámetros Disponibles}
+
+\begin{longtable}{|p{4.5cm}|p{3cm}|p{6.5cm}|}
+\hline
+\textbf{Parámetro} & \textbf{Rango} & \textbf{Descripción} \\ \hline
+\endhead
+
+\textbf{Sensibilidad de Área (\%)} & 0.1 - 10.0 & Porcentaje del ROI que debe cambiar para detectar movimiento. \newline \textit{Defecto: 1.0\%} \\ \hline
+
+\textbf{Sensibilidad de Detección} & 5 - 100 & Umbral de cambio de píxeles. Valores bajos = más sensible. \newline \textit{Defecto: 16} \\ \hline
+
+\textbf{Tiempo entre Detecciones (ms)} & 1000 - 30000 & Tiempo mínimo entre eventos consecutivos. \newline \textit{Defecto: 2000 ms} \\ \hline
+
+\textbf{Desenfoque Gaussiano} & (1,1) - (15,15) & Suavizado para reducir ruido. \newline \textit{Defecto: (5,5)} \\ \hline
+
+\textbf{Kernel Morfológico} & (1,1) - (7,7) & Tamaño del filtro morfológico. \newline \textit{Defecto: (3,3)} \\ \hline
+\end{longtable}
+
+\subsection{¿Cuándo modificar estos valores?}
+
+\textbf{Aumenta la sensibilidad si:}
+\begin{itemize}
+    \item No detecta movimientos pequeños (ej: personas lejanas).
+    \item El análisis ignora eventos que sí son importantes.
+\end{itemize}
+
+\textbf{Reduce la sensibilidad si:}
+\begin{itemize}
+    \item Genera demasiados clips de sombras o cambios de luz.
+    \item Detecta movimiento de árboles, nubes o reflejos.
+\end{itemize}
+
+\section{Ayuda y Soporte Técnico}
+
+\subsection{Pantalla de Ayuda}
+
+\begin{longtable}{|p{4cm}|p{5cm}|p{5cm}|}
+\hline
+	extbf{Problema} & \textbf{Posible Causa} & \textbf{Solución} \\ \hline
+\endhead
+	extbf{No detecta movimiento} & ROI mal definida o parámetros muy estrictos. & Dibuja la ROI de nuevo. Revisa la Configuración Avanzada y usa valores por defecto. \\ \hline
+	extbf{Demasiadas detecciones} & Configuración muy sensible. ROI en zona de ruido (árboles). & Aumenta los valores de sensibilidad. Ajusta la ROI para excluir zonas de ruido. \\ \hline
+	extbf{Video no se procesa} & Formato no compatible o archivo corrupto. & Convierte el video a MP4 estándar. \\ \hline
+	extbf{La tarea falla} & Error en el backend o video muy largo/pesado. & Intenta con un video más corto. Contacta con soporte y revisa los "Logs". \\ \hline
+\end{longtable}
+
+% --- SECCIÓN 7: SOPORTE Y CONTACTO ---
+\section{Ayuda y Soporte Técnico}
+
+\subsection{Pantalla de Ayuda}
+
+La sección \textbf{CONFIGURACIÓN} $\rightarrow$ \textbf{Ayuda} proporciona información de contacto y resolución de problemas.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{imagenes/Ayuda.png}
+    \caption{Pantalla de ayuda y contacto.}
+    \label{fig:ayuda}
+\end{figure}
+
+\textbf{Información disponible:}
+\begin{itemize}
+    \item \textbf{Versión de la aplicación}: 2.0 (Web)
+    \item \textbf{Institución}: Escuela Politécnica
+    \item \textbf{Departamento}: Grupo de Ingeniería de Medios
+    \item \textbf{Formatos soportados}: MP4, AVI, MOV, DAV, XVR
+    \item \textbf{Procedimiento de reporte de errores}
+\end{itemize}
+
+\section{Visualización de Logs del Sistema}
+
+Los logs proporcionan información detallada sobre el funcionamiento interno de la aplicación y son útiles para diagnóstico de errores.
+
+\subsection{Acceder a los Logs}
+
+El botón \textbf{Ver Logs} se encuentra en la esquina superior derecha de la aplicación.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/Logs.png}
+    \caption{Visor de logs del sistema en tiempo real.}
+    \label{fig:logs}
+\end{figure}
+
+\textbf{Funciones del visor:}
+\begin{itemize}
+    \item \textbf{Actualización automática}: Los logs se refrescan automáticamente cada 1 segundo.
+    \item \textbf{Scroll automático}: La vista se desplaza automáticamente al último mensaje.
+    \item \textbf{Copiar logs}: Puedes seleccionar y copiar mensajes específicos.
+\end{itemize}
+
+\subsection{Tipos de Mensajes de Log}
+
+\begin{longtable}{|p{3cm}|p{11cm}|}
+\hline
+\textbf{Nivel} & \textbf{Descripción} \\ \hline
+\endhead
+
+\texttt{[INFO]} & Operaciones normales del sistema (inicio de análisis, finalización, archivos procesados). \\ \hline
+
+\texttt{[WARNING]} & Situaciones anormales pero no críticas (archivos saltados, formatos no soportados). \\ \hline
+
+\texttt{[ERROR]} & Errores que impiden completar una operación (archivo corrupto, ROI inválido). \\ \hline
+
+\texttt{[DEBUG]} & Información técnica detallada para desarrollo (solo visible en modo debug). \\ \hline
+\end{longtable}
+
+\subsection{¿Cuándo revisar los logs?}
+
+\textbf{Debes consultar los logs si:}
+\begin{itemize}
+    \item El análisis se detiene inesperadamente.
+    \item No se generan clips cuando deberían existir.
+    \item La aplicación se comporta de forma inusual.
+    \item Necesitas reportar un problema al soporte técnico.
+\end{itemize}
+
+\begin{tcolorbox}[colback=primaryblue!10,colframe=primaryblue,title=Tip para Soporte]
+Si necesitas ayuda técnica, copia los últimos 50-100 mensajes de log y envíalos junto con tu consulta. Esto ayuda a diagnosticar problemas rápidamente.
+\end{tcolorbox}
+
+\section{Análisis en Directo (Función en Desarrollo)}
+
+La función de análisis en directo permite analizar streams de video en tiempo real.
+
+\begin{tcolorbox}[colback=warningorange!10,colframe=warningorange,title=Estado: En Desarrollo]
+Esta funcionalidad está actualmente en fase de prueba y puede no estar disponible en todas las instalaciones.
+\end{tcolorbox}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{imagenes/image_6889f9.png}
+    \caption{Interfaz de configuración de Análisis en Directo.}
+    \label{fig:directo}
+\end{figure}
+
+\textbf{Características planeadas:}
+\begin{itemize}
+    \item Análisis de streams MJPEG en tiempo real
+    \item Captura de fotogramas y definición de ROI
+    \item Detección de movimiento continua
+    \item Generación automática de clips de eventos
+\end{itemize}
+
+\section{Solución de Problemas Comunes}
+
+\subsection{El análisis no detecta eventos}
+
+\textbf{Posibles causas y soluciones:}
+
+\begin{enumerate}
+    \item \textbf{ROI muy pequeño o mal posicionado}
+    \begin{itemize}
+        \item Solución: Vuelve a configurar el ROI asegurándote de cubrir el área donde ocurre el movimiento.
+    \end{itemize}
+    
+    \item \textbf{Sensibilidad muy baja}
+    \begin{itemize}
+        \item Solución: En Configuración Avanzada, aumenta la "Sensibilidad de Área" gradualmente.
+    \end{itemize}
+    
+    \item \textbf{Video muy oscuro o borroso}
+    \begin{itemize}
+        \item Solución: El algoritmo puede tener dificultades con videos de mala calidad. Verifica la iluminación y resolución.
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Demasiados falsos positivos}
+
+\textbf{Síntomas}: La aplicación genera clips de sombras, nubes, movimiento de árboles, etc.
+
+\textbf{Soluciones:}
+\begin{enumerate}
+    \item \textbf{Reduce el ROI}: Excluye áreas con movimiento constante no deseado.
+    \item \textbf{Aumenta el umbral de sensibilidad}: En Configuración Avanzada, aumenta el valor de "Sensibilidad de Detección".
+    \item \textbf{Aumenta el tiempo entre detecciones}: Aumenta el "Tiempo de Enfriamiento (ms)" para evitar múltiples detecciones del mismo evento.
+\end{enumerate}
+
+\subsection{La aplicación no inicia o se cierra}
+
+\textbf{Verificaciones:}
+\begin{enumerate}
+    \item \textbf{Revisa los logs del sistema}: Ve a la carpeta \texttt{logs/} y abre el archivo más reciente.
+    \item \textbf{Verifica puertos ocupados}: La aplicación usa el puerto 5000. Asegúrate de que no esté en uso por otra aplicación.
+    \item \textbf{Reinstala la aplicación}: Desinstala completamente y vuelve a instalar desde el instalador portable.
+\end{enumerate}
+
+\subsection{Error al extraer timestamp de videos}
+
+\textbf{Síntoma}: La columna "FECHA Y HORA" en Excel muestra valores incorrectos o vacíos.
+
+\textbf{Causa}: El ROI de timestamp no está correctamente configurado.
+
+\textbf{Solución}:
+\begin{enumerate}
+    \item Ve a \textbf{CONFIGURACIÓN} $\rightarrow$ \textbf{Configurar Zona Hora}.
+    \item Sube un video de ejemplo.
+    \item Dibuja el rectángulo exactamente sobre la zona donde aparece la fecha/hora en el video.
+    \item Asegúrate de incluir \textbf{todos los dígitos} (año, mes, día, hora, minutos, segundos).
+    \item Guarda la configuración y vuelve a analizar.
+\end{enumerate}
+
+\subsection{Videos .DAV o .XVR no se procesan}
+
+\textbf{Solución}:
+\begin{itemize}
+    \item La aplicación incluye conversión automática de formatos propietarios (DAV, XVR) a MP4.
+    \item Si encuentras errores, verifica que FFmpeg esté correctamente incluido en la carpeta de instalación.
+    \item Revisa los logs para ver si hay mensajes de error relacionados con la conversión.
+\end{itemize}
+
+\begin{tcolorbox}[colback=warningorange!10,colframe=warningorange,title=Nota sobre Formatos]
+Los formatos .DAV y .XVR requieren conversión previa. Esto puede aumentar el tiempo de procesamiento inicial.
+\end{tcolorbox}
+
+\section{Preguntas Frecuentes (FAQ)}
+
+\subsection{¿Puedo analizar videos mientras la aplicación está procesando otros?}
+
+\textbf{No.} El sistema procesa análisis de forma secuencial. Debes esperar a que termine el análisis actual antes de iniciar uno nuevo.
+
+\subsection{¿Cuánto tiempo tarda un análisis?}
+
+Depende de varios factores:
+\begin{itemize}
+    \item \textbf{Duración total de los videos}: Un video de 1 hora tarda aproximadamente 5-10 minutos.
+    \item \textbf{Formato original}: Videos .DAV/.XVR tardan más por la conversión inicial.
+    \item \textbf{Uso de IA}: El análisis con YOLO es más lento (~20-30\% más tiempo).
+    \item \textbf{Tamaño del ROI}: Un ROI más pequeño procesa más rápido.
+\end{itemize}
+
+\subsection{¿Dónde se guardan los clips generados?}
+
+Los clips se almacenan en la carpeta \texttt{static/uploads/} dentro de la instalación de la aplicación. Cada sesión de análisis tiene su propia subcarpeta con nombre de timestamp.
+
+\textbf{Ejemplo de estructura:}
+\begin{verbatim}
+static/uploads/
+├── session_20241113_153000/
+│   ├── analisis_calle/
+│   │   ├── video1.mp4
+│   │   └── clips_analisis/
+│   │       ├── person_20241113_153045.mp4
+│   │       ├── car_20241113_154012.mp4
+│   │       └── ...
+\end{verbatim}
+
+\subsection{¿Puedo editar manualmente la clasificación de objetos?}
+
+\textbf{Sí.} En la ventana de "Detalles del Clip":
+\begin{enumerate}
+    \item Haz clic en el icono del lápiz junto a "Objeto Detectado".
+    \item Selecciona el tipo correcto de la lista desplegable.
+    \item Guarda los cambios.
+    \item La tabla Excel se actualizará automáticamente.
+\end{enumerate}
+
+\subsection{¿La aplicación funciona sin conexión a Internet?}
+
+\textbf{Sí, completamente.} La aplicación es 100\% offline. No requiere conexión a Internet para ninguna funcionalidad, incluido el análisis con IA (YOLO se ejecuta localmente).
+
+\subsection{¿Cómo actualizo la aplicación?}
+
+\begin{enumerate}
+    \item Descarga el nuevo instalador portable.
+    \item Desinstala la versión anterior (esto NO borrará tus análisis guardados).
+    \item Instala la nueva versión ejecutando el nuevo instalador.
+    \item Tus configuraciones y sesiones se mantendrán si instalas en la misma ubicación.
+\end{enumerate}
+
+\section{Glosario Técnico}
+
+\begin{longtable}{|p{4cm}|p{10cm}|}
+\hline
+\textbf{Término} & \textbf{Definición} \\ \hline
+\endhead
+
+\textbf{ROI} & \textit{Region of Interest} (Región de Interés). Área específica del video donde se realiza el análisis de movimiento. \\ \hline
+
+\textbf{Clip} & Segmento de video de 16 segundos generado cuando se detecta movimiento (8 segundos antes + 8 segundos después del evento). \\ \hline
+
+\textbf{Timestamp} & Marca de tiempo que indica la fecha y hora exacta de un evento. \\ \hline
+
+\textbf{YOLO} & \textit{You Only Look Once}. Algoritmo de detección de objetos basado en redes neuronales que identifica personas, vehículos, etc. \\ \hline
+
+\textbf{FFmpeg} & Herramienta de conversión de video incluida en la aplicación para procesar formatos propietarios como DAV y XVR. \\ \hline
+
+\textbf{Sesión} & Instancia única de análisis que contiene todos los videos y clips procesados en una ejecución. \\ \hline
+
+\textbf{Falso Positivo} & Detección de movimiento que no corresponde a un evento real (ej: sombras, cambios de luz). \\ \hline
+
+\textbf{Background Subtraction} & Técnica algorítmica que detecta movimiento comparando el frame actual con el fondo aprendido. \\ \hline
+\end{longtable}
+
+\section{Información Técnica Adicional}
+
+\subsection{Requisitos del Sistema}
+
+\begin{longtable}{|p{4cm}|p{10cm}|}
+\hline
+\textbf{Componente} & \textbf{Especificación Mínima} \\ \hline
+\endhead
+
+\textbf{Sistema Operativo} & Windows 10 64-bit o superior \\ \hline
+\textbf{Procesador} & Intel Core i5 o equivalente (4 núcleos recomendado) \\ \hline
+\textbf{Memoria RAM} & 8 GB (16 GB recomendado para análisis con IA) \\ \hline
+\textbf{Espacio en Disco} & 10 GB libres (más espacio adicional para almacenamiento de clips) \\ \hline
+\textbf{Tarjeta Gráfica} & No requerida (CPU sola es suficiente) \\ \hline
+\end{longtable}
+
+\subsection{Tecnologías Utilizadas}
+
+La aplicación está construida con las siguientes tecnologías:
+
+\begin{itemize}
+    \item \textbf{Electron}: Framework para aplicaciones de escritorio multiplataforma.
+    \item \textbf{Python 3.11}: Backend para procesamiento de video.
+    \item \textbf{Flask}: Servidor web interno para la interfaz.
+    \item \textbf{OpenCV}: Biblioteca de visión por computadora para análisis de movimiento.
+    \item \textbf{YOLOv10}: Modelo de detección de objetos basado en deep learning.
+    \item \textbf{FFmpeg}: Conversión y procesamiento de formatos de video.
+\end{itemize}
+
+\subsection{Información de Desarrollo}
+
+\textbf{Institución}: Escuela Politécnica
+
+\textbf{Departamento}: Grupo de Ingeniería de Medios
+
+\textbf{Versión}: 2.0 (Web)
+
+\textbf{Soporte técnico}: Para problemas técnicos, contacte con el administrador del sistema adjuntando los logs del sistema.
+
+\end{document}
+
+
+% --- SECCIÓN 4: CONFIGURACIÓN DE ZONA HORARIA ---
+\section{Configuración de Zona Horaria}
+Esta sección, accesible desde \textbf{CONFIGURACIÓN} -> \textbf{Configurar Zona Hora}, es crucial para que el sistema pueda leer correctamente la fecha y hora estampadas en el video.
+
+Es una configuración que \textbf{solo necesita realizarse una vez}, siempre y cuando todos los videos a procesar tengan la marca de tiempo (fecha y hora) en la misma posición. Si se procesan videos de diferentes cámaras con distintas ubicaciones de hora, esta configuración deberá ajustarse.
+
+\subsection{Paso 1: Subir Video de Referencia}
+El primer paso es cargar un video de muestra para que el sistema pueda extraer un fotograma.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{imagenes/ConfigurarHora_Paso1.png}
+    \caption{Subir video de referencia.}
+    \label{fig:zona-hora-1}
+    \par\medskip
+    \textit{La pantalla inicial solicita "Subir Video de Referencia". Se debe hacer clic en \textbf{Seleccionar Video} y elegir un video que sea representativo del lote que se desea analizar.}
+\end{figure}
+
+\subsection{Paso 2: Definir la Zona de Hora}
+Una vez cargado el video, se mostrará un fotograma para definir el área donde se encuentra la hora.
+
+\begin{figure}[h]
+    \centering
+        \includegraphics[width=\textwidth]{imagenes/ConfigurarHora_Paso2.png}
+    \caption{Selección del área de la marca de tiempo.}
+    \label{fig:zona-hora-2}
+    \par\medskip
+    \textit{Esta interfaz es similar a la configuración del ROI. Se debe \textbf{arrastrar el mouse} para dibujar un recuadro (resaltado en azul) que encierre \textbf{exactamente} la zona donde el video muestra la fecha y la hora. Las coordenadas se actualizan en la parte superior. Al terminar, se debe pulsar \textbf{Guardar Configuración} para almacenar esta posición.}
+\end{figure}
+
+
+
+% --- SECCIÓN 5: FUNCIONES ADICIONALES Y DE SOPORTE ---
+\section{Funciones Adicionales y de Soporte}
+Esta sección cubre las funciones que no son parte del flujo de análisis principal, pero que son útiles para configuración avanzada, soporte y gestión de la sesión.
+
+\subsection{Análisis en Directo (En Desarrollo)}
+La función \textbf{Análisis en Directo}, accesible desde el panel de Análisis, está actualmente en desarrollo. Su objetivo será permitir el análisis de un stream de video (como una URL MJPEG) en tiempo real, en lugar de un archivo de video.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{imagenes/image_6889f9.png}
+    \caption{Interfaz de configuración de Análisis en Directo.}
+    \label{fig:directo}
+    \par\medskip
+    \textit{La interfaz de desarrollo permite ingresar la URL de un stream y capturar un frame para definir el ROI, de forma similar al análisis de video individual.}
+\end{figure}
+
+\subsection{Configuración Avanzada}
+Esta pantalla, accesible desde \textbf{CONFIGURACIÓN} -> \textbf{Configuración Avanzada}, permite un ajuste fino de los parámetros de detección. 
+
+\begin{tcolorbox}[colback=primaryblue!10,colframe=primaryblue,title=Nota Importante]
+Los \textbf{Valores por Defecto} están optimizados para la detección de personas y vehículos. \textbf{No es necesario modificar esta sección} para un funcionamiento normal. Solo se recomienda ajustar estos parámetros si se tiene experiencia o si se desea detectar movimientos muy pequeños, lo cual podría generar más falsos positivos.
+\end{tcolorbox}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{imagenes/ConfiguraccionAvanzada.png}
+    \caption{Parámetros de Detección de Movimiento.}
+    \label{fig:config-avanzada}
+    \par\medskip
+    \textit{Aquí se pueden ajustar valores como el "Umbral de Porcentaje de Cambio" o el "Tiempo de Enfriamiento (ms)" para hacer la detección más o menos sensible.}
+\end{figure}
+
+\subsection{Ayuda y Reporte de Errores}
+La pestaña \textbf{INFORMACIÓN} -> \textbf{Ayuda} contiene información básica de uso, formatos soportados y, lo más importante, la información de contacto y el procedimiento para reportar errores.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{imagenes/Ayuda.png}
+    \caption{Pantalla de Ayuda y Contacto.}
+    \label{fig:ayuda}
+    \par\medskip
+    \textit{La sección "Reportar Errores" explica cómo descargar los logs del sistema para adjuntarlos a un email de soporte, lo cual es vital para diagnosticar problemas.}
+\end{figure}
+
+\subsection{Visor de Logs (Soporte Técnico)}
+El botón \textbf{Ver Logs}, ubicado en la esquina superior derecha de la aplicación, abre el visor de logs del sistema. Esta es una herramienta principalmente para \textbf{desarrollo y depuración}.
+
+\begin{figure}[h]
+    \centering
+    \caption{Pantalla de Logs del Sistema.}
+    \label{fig:logs}
+    \par\medskip
+    \textit{El visor de logs muestra en detalle cada paso interno que realiza la aplicación (INFO, DEBUG, WARNING, ERROR). No es necesario para el usuario, pero es fundamental para que el equipo de soporte pueda ver qué ha fallado si ocurre un error. Desde aquí se puede "Descargar TXT" para enviar el reporte.}
+\end{figure}
+
+
+
+\end{document}
+```eof
+
