@@ -4,7 +4,7 @@
 #define MyAppName "Detector de Movimiento"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "Detector de Movimiento"
-#define MyAppExeName "launch.bat"
+#define MyAppExeName "launch-silent.vbs"
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-4321-8765-ABCDEF123456}
@@ -60,7 +60,8 @@ Source: "yolov10n.pt"; DestDir: "{app}"; Flags: ignoreversion
 ; === ARCHIVOS DE CONFIGURACIÓN ===
 Source: "timestamp_roi_config.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; === LAUNCHER SCRIPT ===
+; === LAUNCHER SCRIPT (SIN TERMINAL) ===
+Source: "launch-silent.vbs"; DestDir: "{app}"; Flags: ignoreversion
 Source: "launch.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
@@ -70,13 +71,13 @@ Name: "{app}\static\uploads"
 Name: "{app}\static\uploads\temp"
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\electron\icon.ico"
+Name: "{group}\{#MyAppName}"; Filename: "wscript.exe"; Parameters: """{app}\{#MyAppExeName}"""; IconFilename: "{app}\electron\icon.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\electron\icon.ico"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "wscript.exe"; Parameters: """{app}\{#MyAppExeName}"""; IconFilename: "{app}\electron\icon.ico"; Tasks: desktopicon
 
 [Run]
 ; Lanzar la aplicación después de instalar (opcional)
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "wscript.exe"; Parameters: """{app}\{#MyAppExeName}"""; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 procedure InitializeWizard();
@@ -87,17 +88,5 @@ begin
     '- Electron y Node.js' + #13#10 +
     '- FFmpeg' + #13#10 +
     '- Modelo YOLO' + #13#10 + #13#10 +
-    'La instalacion ocupara aproximadamente 3.5 GB.' + #13#10 +
     'No se requiere instalar nada adicional en tu sistema.';
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  
-  if CurPageID = wpReady then
-  begin
-    MsgBox('La instalacion puede tardar varios minutos debido al tamaño de los archivos (3.5 GB).' + #13#10 + 
-           'Por favor, ten paciencia.', mbInformation, MB_OK);
-  end;
 end;

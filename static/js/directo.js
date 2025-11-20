@@ -2,9 +2,6 @@
 
 let liveLogsInterval = null;
 let roi = null;
-let isDrawing = false;
-let roiStart = null;
-let roiEnd = null;
 let capturedFrame = null;
 
 // Estado global para saber si el análisis está activo y el ROI confirmado
@@ -64,161 +61,6 @@ window.captureLiveFrame = async function() {
     }
 };
 
-// Inicializar canvas de ROI para directo (idéntico a subir video)
-function initDirectoROICanvas() {
-    const roiCanvas = document.getElementById('roiCanvas');
-    if (!roiCanvas || !capturedFrame) return;
-    const roiCtx = roiCanvas.getContext('2d');
-    let isDrawing = false;
-    let startX = 0, startY = 0;
-    let currentROI = { x: 0, y: 0, w: 0, h: 0 };
-    // Escala para que coincida con pantalla
-    function drawFrame() {
-        roiCtx.clearRect(0, 0, roiCanvas.width, roiCanvas.height);
-        roiCtx.drawImage(capturedFrame, 0, 0, roiCanvas.width, roiCanvas.height);
-        if (currentROI.w > 0 && currentROI.h > 0) {
-            roiCtx.strokeStyle = '#3B82F6';
-            roiCtx.lineWidth = 3;
-            roiCtx.strokeRect(currentROI.x, currentROI.y, currentROI.w, currentROI.h);
-            // Sombreado fuera del ROI
-            roiCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            roiCtx.fillRect(0, 0, roiCanvas.width, currentROI.y);
-            roiCtx.fillRect(0, currentROI.y, currentROI.x, currentROI.h);
-            roiCtx.fillRect(currentROI.x + currentROI.w, currentROI.y, roiCanvas.width - currentROI.x - currentROI.w, currentROI.h);
-            roiCtx.fillRect(0, currentROI.y + currentROI.h, roiCanvas.width, roiCanvas.height - currentROI.y - currentROI.h);
-        }
-    }
-    roiCanvas.onmousedown = function(e) {
-        isDrawing = true;
-        const rect = roiCanvas.getBoundingClientRect();
-        startX = (e.clientX - rect.left) * (roiCanvas.width / rect.width);
-        startY = (e.clientY - rect.top) * (roiCanvas.height / rect.height);
-    };
-    roiCanvas.onmousemove = function(e) {
-        if (!isDrawing) return;
-        const rect = roiCanvas.getBoundingClientRect();
-        const currentX = (e.clientX - rect.left) * (roiCanvas.width / rect.width);
-        const currentY = (e.clientY - rect.top) * (roiCanvas.height / rect.height);
-        const x = Math.min(startX, currentX);
-        const y = Math.min(startY, currentY);
-        const w = Math.abs(currentX - startX);
-        const h = Math.abs(currentY - startY);
-        currentROI = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
-        drawFrame();
-    };
-    roiCanvas.onmouseup = function(e) {
-        isDrawing = false;
-        drawFrame();
-        // Actualizar inputs si existen
-        if (document.getElementById('roiX')) document.getElementById('roiX').value = currentROI.x;
-        if (document.getElementById('roiY')) document.getElementById('roiY').value = currentROI.y;
-        if (document.getElementById('roiW')) document.getElementById('roiW').value = currentROI.w;
-        if (document.getElementById('roiH')) document.getElementById('roiH').value = currentROI.h;
-    };
-    roiCanvas.onmouseleave = function(e) {
-        isDrawing = false;
-    };
-    drawFrame();
-}
-
-// ROI Canvas logic (solo sobre el frame capturado)
-document.addEventListener('DOMContentLoaded', function() {
-    const canvas = document.getElementById('roiCanvas');
-    if (!canvas) return;
-
-    canvas.onmousedown = function(e) {
-        if (!capturedFrame) return;
-        isDrawing = true;
-        const rect = canvas.getBoundingClientRect();
-        roiStart = {
-            x: Math.round(e.clientX - rect.left),
-            y: Math.round(e.clientY - rect.top)
-        };
-        roiEnd = { ...roiStart };
-        drawROI();
-    };
-
-    canvas.onmousemove = function(e) {
-        if (!isDrawing || !capturedFrame) return;
-        const rect = canvas.getBoundingClientRect();
-        roiEnd = {
-            x: Math.max(0, Math.min(canvas.width, Math.round(e.clientX - rect.left))),
-            y: Math.max(0, Math.min(canvas.height, Math.round(e.clientY - rect.top)))
-        };
-        drawROI();
-    };
-
-    canvas.onmouseup = function(e) {
-        isDrawing = false;
-        drawROI();
-    };
-
-    function drawROI() {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (capturedFrame) ctx.drawImage(capturedFrame, 0, 0, canvas.width, canvas.height);
-        if (roiStart && roiEnd) {
-            const x = Math.min(roiStart.x, roiEnd.x);
-            const y = Math.min(roiStart.y, roiEnd.y);
-            const w = Math.abs(roiEnd.x - roiStart.x);
-            const h = Math.abs(roiEnd.y - roiStart.y);
-            ctx.strokeStyle = '#3B82F6';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, w, h);
-        }
-    }
-
-    window.confirmROI = async function() {
-        if (!roiStart || !roiEnd || !capturedFrame) {
-            showNotification('Selecciona una zona en el frame capturado', 'warning');
-            return;
-        }
-        const x = Math.min(roiStart.x, roiEnd.x);
-        const y = Math.min(roiStart.y, roiEnd.y);
-        const w = Math.abs(roiEnd.x - roiStart.x);
-        const h = Math.abs(roiEnd.y - roiStart.y);
-        if (w < 10 || h < 10) {
-            showNotification('El ROI debe ser mayor de 10x10 px', 'warning');
-            return;
-        }
-        roi = [x, y, w, h];
-        document.getElementById('roiCoordsDisplay').textContent =
-            `ROI seleccionado: x=${x}, y=${y}, w=${w}, h=${h}`;
-        document.getElementById('confirmROIBtn').disabled = false;
-        document.getElementById('startLiveBtn') && (document.getElementById('startLiveBtn').disabled = false);
-        showNotification('ROI confirmado', 'success');
-        // Guardar ROI de directo en backend
-        try {
-            await fetch(buildApiUrl('/api/config/roi/live'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ x, y, w, h })
-            });
-        } catch (err) {
-            showNotification('No se pudo guardar el ROI de directo en el backend', 'error');
-        }
-        window.showDirectoLiveView(); // <-- Cambia la vista tras confirmar ROI
-
-    };
-
-    window.resetROI = function() {
-        if (!capturedFrame) {
-            showNotification('Primero captura un frame', 'warning');
-            return;
-        }
-        roiStart = { x: 0, y: 0 };
-        roiEnd = { x: capturedFrame.width, y: capturedFrame.height };
-        roi = [0, 0, capturedFrame.width, capturedFrame.height];
-        document.getElementById('roiCoordsDisplay').textContent = `ROI seleccionado: x=0, y=0, w=${capturedFrame.width}, h=${capturedFrame.height}`;
-        document.getElementById('startLiveBtn').disabled = false;
-        drawROI();
-        updateStartLiveBtnState();
-    };
-
-    // Llamar a updateStartLiveBtnState en los puntos clave
-    updateStartLiveBtnState();
-});
-
 // Iniciar análisis en directo solo tras confirmar ROI
 function startLiveAnalysis() {
     const streamUrl = document.getElementById('streamUrlInput').value;
@@ -251,26 +93,9 @@ function startLiveLogsPolling() {
 }
 
 async function showDirectoView() {
-
-    if (document.querySelector('.top-bar')) {
-        document.querySelector('.top-bar').innerHTML = `
-            <h2 id="view-title" style="display:flex;align-items:center;gap:10px;">
-                <i class="fas fa-broadcast-tower" style="color:#EF4444;"></i> 🔴 Análisis en Directo
-            </h2>
-            <div class="top-bar-actions">
-                <button class="btn-top-bar" onclick="loadView('logs', event)" title="Ver logs del sistema">
-                    <i class="fas fa-file-alt"></i>
-                    Ver Logs
-                </button>
-                <button class="btn-top-bar" onclick="loadView('welcome', event)" title="Ir a Inicio">
-                    <i class="fas fa-home"></i>
-                    Inicio
-                </button>
-            </div>
-        `;
-    }
+    // Solo actualizar el título sin tocar los botones del top-bar
     if (window.updateViewTitle) {
-        updateViewTitle('<i class="fas fa-broadcast-tower" style="color:#EF4444;"></i> 🔴 Análisis en Directo');
+        updateViewTitle('📡 Análisis en Directo');
     }
     // Carga el HTML de la vista en directo (puedes usar un template string aquí)
     const content = `
@@ -353,10 +178,9 @@ window.showDirectoInitView = function() {
         window.showDirectoLiveView();
         return;
     }
-    if (document.querySelector('.top-bar')) {
-        document.querySelector('.top-bar').innerHTML = `
-            <h2 id="view-title"><i class="fas fa-broadcast-tower" style="color:#EF4444;"></i> Selección de ROI en Directo</h2>
-        `;
+    // Solo actualizar el título sin tocar el top-bar completo
+    if (window.updateViewTitle) {
+        updateViewTitle('🎯 Análisis en Directo - Configurar ROI');
     }
     const content = `
         <div class="roi-processing-container">
@@ -573,8 +397,8 @@ window.showDirectoLiveView = function() {
             <div style="flex: 2;">
                 <h2>Directo en Tiempo Real</h2>
                 <div id="liveStreamContainer" style="position:relative; width:100%; max-width:640px;">
-                    <img id="liveStreamVideo" src="${document.getElementById('streamUrlInput') ? document.getElementById('streamUrlInput').value : 'http://localhost:8080/video_feed'}" style="width:100%;max-width:640px;border-radius:8px;border:2px solid #3B82F6;box-shadow:0 2px 8px #0002;display:block;" alt="Stream en directo" />
-                    <canvas id="roiOverlayCanvas" width="640" height="480" style="position:absolute;top:0;left:0;pointer-events:none;z-index:2;"></canvas>
+                    <img id="liveStreamVideo" src="${document.getElementById('streamUrlInput') ? document.getElementById('streamUrlInput').value : 'http://localhost:8080/video_feed'}" style="width:100%;max-width:640px;border-radius:8px;box-shadow:0 2px 8px #0002;display:block;" alt="Stream en directo" />
+                    <canvas id="roiOverlayCanvas" width="640" height="480" style="position:absolute;top:0;left:0;pointer-events:none;z-index:2;border-radius:8px;"></canvas>
                 </div>
                 <button class="btn" onclick="forceDirectoConfigView()">
                     <i class="fas fa-arrow-left"></i> Volver a configuración
@@ -587,40 +411,59 @@ window.showDirectoLiveView = function() {
         </div>
     `;
     // Dibuja el ROI sobre el canvas, sombreando el resto
-    setTimeout(function() {
+    function drawROIOverlay() {
         const roi = window.directoROI;
         const canvas = document.getElementById('roiOverlayCanvas');
         const img = document.getElementById('liveStreamVideo');
-        if (canvas && roi && roi.length === 4 && img) {
-            // Ajustar el canvas al tamaño real del video mostrado
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Sombrear toda la imagen
-            ctx.fillStyle = 'rgba(0,0,0,0.45)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            // Calcular escala si el ROI viene de una imagen de diferente tamaño
-            let scaleX = img.width / (img.naturalWidth || img.width);
-            let scaleY = img.height / (img.naturalHeight || img.height);
-            // El ROI se define sobre la imagen original, hay que escalar a la vista
-            const roiX = roi[0] * scaleX;
-            const roiY = roi[1] * scaleY;
-            const roiW = roi[2] * scaleX;
-            const roiH = roi[3] * scaleY;
-            // Recortar la zona del ROI (transparente)
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(roiX, roiY, roiW, roiH);
-            ctx.clip();
-            ctx.clearRect(roiX, roiY, roiW, roiH);
-            ctx.restore();
-            // Dibujar el marco del ROI
-            ctx.strokeStyle = '#EF4444';
-            ctx.lineWidth = 4;
-            ctx.strokeRect(roiX, roiY, roiW, roiH);
+        if (!canvas || !roi || roi.length !== 4 || !img || !img.complete) {
+            return;
         }
-    }, 500);
+        
+        // Ajustar el canvas al tamaño real del video mostrado
+        canvas.width = img.clientWidth;
+        canvas.height = img.clientHeight;
+        const ctx = canvas.getContext('2d');
+        
+        // Limpiar todo el canvas primero
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Calcular escala si el ROI viene de una imagen de diferente tamaño
+        let scaleX = img.clientWidth / (capturedFrame ? capturedFrame.width : img.clientWidth);
+        let scaleY = img.clientHeight / (capturedFrame ? capturedFrame.height : img.clientHeight);
+        
+        // El ROI se define sobre la imagen original, hay que escalar a la vista
+        const roiX = roi[0] * scaleX;
+        const roiY = roi[1] * scaleY;
+        const roiW = roi[2] * scaleX;
+        const roiH = roi[3] * scaleY;
+        
+        // Dibujar sombreado en las 4 áreas fuera del ROI
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        // Área superior
+        ctx.fillRect(0, 0, canvas.width, roiY);
+        // Área izquierda
+        ctx.fillRect(0, roiY, roiX, roiH);
+        // Área derecha
+        ctx.fillRect(roiX + roiW, roiY, canvas.width - (roiX + roiW), roiH);
+        // Área inferior
+        ctx.fillRect(0, roiY + roiH, canvas.width, canvas.height - (roiY + roiH));
+        
+        // Dibujar el marco del ROI
+        ctx.strokeStyle = '#10B981';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(roiX, roiY, roiW, roiH);
+    }
+    // Esperar a que la imagen cargue y luego dibujar
+    const imgElement = document.getElementById('liveStreamVideo');
+    if (imgElement) {
+        // Remover cualquier listener anterior para evitar dibujar múltiples veces
+        imgElement.removeEventListener('load', drawROIOverlay);
+        if (imgElement.complete) {
+            drawROIOverlay();
+        } else {
+            imgElement.addEventListener('load', drawROIOverlay, { once: true });
+        }
+    }
     // Iniciar polling de logs si no está activo
     if (!liveLogsInterval) {
         startLiveLogsPolling();

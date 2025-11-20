@@ -12,7 +12,7 @@
   "author": "Detector de Movimiento",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.0.0",
+    "electron": "^28.3.3",
     "electron-builder": "^24.9.1"
   },
   "dependencies": {
@@ -38,10 +38,25 @@
       "!*.pyc",
       "!.git"
     ],
-
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "electron/icon.png",
       "publisherName": "Detector de Movimiento"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "electron/icon.ico",
+      "uninstallerIcon": "electron/icon.ico"
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
