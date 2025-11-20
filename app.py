@@ -1126,7 +1126,7 @@ def serve_temp_video(filename):
 
 @app.route('/api/generate-roi-preview', methods=['POST'])
 def generate_roi_preview():
-    """Genera un preview ligero (1 frame, resolución original) del video para selección de ROI"""
+    """Genera un frame del video para selección de ROI"""
     try:
         data = request.json
         video_filename = data.get('filename')
@@ -1149,55 +1149,70 @@ def generate_roi_preview():
         # Nombre del preview (usando hash del path para evitar colisiones)
         import hashlib
         preview_id = hashlib.md5(video_path.encode()).hexdigest()[:8]
-        preview_filename = f'roi_preview_{preview_id}.mp4'
-        preview_path = os.path.join(temp_folder, preview_filename)
+        frame_filename = f'roi_frame_{preview_id}.jpg'
+        frame_path = os.path.join(temp_folder, frame_filename)
         
-        # Si ya existe el preview, devolverlo
-        if os.path.exists(preview_path):
-            preview_size = os.path.getsize(preview_path) / 1024  # KB
-            logger.info(f"✓ Preview ya existe (1 frame MP4, resolución original): {preview_filename} ({preview_size:.1f}KB)")
+        # Si ya existe el frame, devolverlo
+        if os.path.exists(frame_path):
+            logger.info(f"✓ Frame ya existe: {frame_filename}")
             return jsonify({
                 'success': True,
-                'preview_filename': preview_filename,
-                'preview_url': f'/temp/{preview_filename}'
+                'preview_id': preview_id,
+                'total_frames': 1
             })
         
-        logger.info(f"🎬 Generando preview para ROI (resolución original - solo primer frame): {video_filename}")
+        logger.info(f"🎬 Generando frame para ROI: {video_filename}")
         
-        # Generar preview: video de 1 frame en resolución original (compatible con navegador)
-
+        # Extraer primer frame con FFmpeg (más confiable que OpenCV para videos DAV/XVR)
         ffmpeg_exe = video_processing.get_ffmpeg_path()
         
         cmd = [
             ffmpeg_exe,
             '-i', video_path,
-            '-vframes', '1',  # Solo 1 frame (el primero)
-            '-c:v', 'libx264',  # Codec H.264 compatible
-            '-pix_fmt', 'yuv420p',  # Formato de pixel compatible navegador
-            '-movflags', '+faststart',  # Optimizar para web
-            '-an',  # Sin audio
+            '-vframes', '1',  # Solo 1 frame
+            '-q:v', '2',  # Alta calidad JPEG
             '-y',
-            preview_path
+            frame_path
         ]
         
-        logger.info(f"🔧 Ejecutando FFmpeg para preview (1 frame MP4)...")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        creation_flags = 0x08000000 if sys.platform == 'win32' else 0
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, creationflags=creation_flags)
         
-        if result.returncode == 0 and os.path.exists(preview_path):
-            preview_size = os.path.getsize(preview_path) / 1024  # KB
-            logger.info(f"✅ Preview generado en resolución original (1 frame MP4): {preview_filename} ({preview_size:.1f}KB)")
-            
+        if result.returncode == 0 and os.path.exists(frame_path):
+            frame_size = os.path.getsize(frame_path) / 1024  # KB
+            logger.info(f"✅ Frame generado para ROI: {frame_filename} ({frame_size:.1f}KB)")
             return jsonify({
                 'success': True,
-                'preview_filename': preview_filename,
-                'preview_url': f'/temp/{preview_filename}'
+                'preview_id': preview_id,
+                'total_frames': 1
             })
         else:
-            logger.error(f"❌ Error generando preview: {result.stderr}")
-            return jsonify({'success': False, 'error': 'Error al generar preview'}), 500
+            logger.error(f"❌ Error generando frame: {result.stderr}")
+            return jsonify({'success': False, 'error': 'Error al extraer frame del video'}), 500
             
     except Exception as e:
         logger.error(f"❌ Error en generate_roi_preview: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/get-roi-frame/<preview_id>', methods=['GET'])
+def get_roi_frame(preview_id):
+    """Obtiene el frame para la vista de ROI"""
+    try:
+        temp_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
+        
+        # Buscar el frame único (nuevo sistema)
+        frame_filename = f'roi_frame_{preview_id}.jpg'
+        frame_path = os.path.join(temp_folder, frame_filename)
+        
+        if not os.path.exists(frame_path):
+            logger.error(f"❌ Frame no encontrado: {frame_path}")
+            return jsonify({'success': False, 'error': 'Frame no encontrado'}), 404
+        
+        logger.info(f"✓ Sirviendo frame ROI: {frame_filename}")
+        return send_file(frame_path, mimetype='image/jpeg')
+        
+    except Exception as e:
+        logger.error(f"❌ Error obteniendo frame: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/upload', methods=['POST'])
@@ -1928,7 +1943,8 @@ def process_queue():
     
     # Todos los trabajos completados
     processing_status['is_processing'] = False
-    logger.info("🏁 Procesador de cola finalizado, is_processing=False")
+    processing_status['just_completed'] = True  # Marcar como completado
+    logger.info("🏁 Procesador de cola finalizado, is_processing=False, just_completed=True")
 
 def calculate_event_datetime(base_timestamp_str, event_ms):
     """
@@ -2396,6 +2412,15 @@ def get_processing_status():
         logger.info(f"📊 Estado de procesamiento: is_processing={current_is_processing}, just_completed={just_completed_flag}")
         get_processing_status._last_logged_state = current_is_processing
     
+    # Log de estado cada vez que se consulta
+    logger.info(f"[STATUS] Consulta estado: is_processing={processing_status.get('is_processing', False)}, just_completed={processing_status.get('just_completed', False)}, pending_jobs={queue_info['pending_jobs']}")
+
+    # Si no hay trabajos pendientes y no está procesando, limpiar bandera just_completed automáticamente
+    if queue_info['pending_jobs'] == 0 and not processing_status.get('is_processing', False):
+        logger.info("[STATUS] Limpiando bandera just_completed (cola vacía y no procesando)")
+        processing_status['just_completed'] = False
+        just_completed_flag = False
+
     return jsonify({
         'is_processing': processing_status.get('is_processing', False),
         'current_video': processing_status.get('current_video', ''),
@@ -2414,7 +2439,7 @@ def get_processing_status():
         'objects_detected': processing_status.get('objects_detected', 0),  # Objetos en el trabajo ACTUAL
         'objects_detected_all': processing_status.get('objects_detected_all', 0),  # Objetos ACUMULADOS en toda la cola
         'last_completed': processing_status.get('last_completed'),
-        'just_completed': just_completed_flag,
+        'just_completed': processing_status.get('just_completed', False),
         'queue': queue_info,
         'completed_tasks': processing_status.get('completed_tasks', [])  # Lista de tareas completadas
     })
@@ -2798,6 +2823,7 @@ def delete_folder(folder_id):
 def clear_completed_flag():
     """Limpia el flag de procesamiento completado"""
     global processing_status
+    logger.info(f"[STATUS] clear_completed_flag llamado. Limpiando bandera just_completed.")
     processing_status['just_completed'] = False
     return jsonify({'success': True})
 

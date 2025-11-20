@@ -284,52 +284,67 @@ def process_video_for_motion_advanced(video_path, roi, config=None):
     is_in_motion = False
     motion_start_time = 0
     last_motion_end_time = 0
+    last_event_registered_time = 0  # Nuevo: tiempo del último evento REGISTRADO
     motion_events_ms = []
     frame_count = 0
     
     logger.info(f"Análisis avanzado - ROI: {roi}")
     logger.info(f"Umbral adaptativo: {threshold} píxeles (config: {config})")
     
+    last_event_registered_time = None
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-            
+
         frame_count += 1
         timestamp_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
-        
+
         # Validar ROI
         if (roi[1] + roi[3] > frame.shape[0] or roi[0] + roi[2] > frame.shape[1] or
             roi[0] < 0 or roi[1] < 0 or roi[2] <= 0 or roi[3] <= 0):
             logger.error(f"ROI inválido: {roi}")
             break
-            
+
         roi_frame = frame[roi[1]:roi[1]+roi[3], roi[0]:roi[0]+roi[2]]
         roi_frame = cv2.GaussianBlur(roi_frame, config['gaussian_blur'], 0)
-        
+
         fgmask = fgbg.apply(roi_frame)
-        
+
         # Procesamiento morfológico
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, config['morph_kernel_size'])
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel)
-        
+
         thresh = cv2.threshold(fgmask, config['binary_threshold'], 255, cv2.THRESH_BINARY)[1]
         contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+
         total_motion_area = sum(cv2.contourArea(contour) for contour in contours)
         movement_detected_this_frame = total_motion_area > threshold
 
         if movement_detected_this_frame and not is_in_motion:
-            if (timestamp_ms - last_motion_end_time) > config['cooldown_ms']:
-                is_in_motion = True
-                motion_start_time = timestamp_ms
+            # Iniciar nuevo período de movimiento
+            is_in_motion = True
+            motion_start_time = timestamp_ms
+            logger.debug(f"Movimiento iniciado en {timestamp_ms:.0f}ms")
 
         if not movement_detected_this_frame and is_in_motion:
+            # Fin del movimiento - verificar cooldown antes de registrar
             is_in_motion = False
             last_motion_end_time = timestamp_ms
-            # Detectar todos los eventos sin restricción de duración mínima
-            motion_events_ms.append(motion_start_time)
+
+            # Solo registrar evento si han pasado cooldown_ms desde el último evento registrado
+            if last_event_registered_time is None or (motion_start_time - last_event_registered_time) >= config['cooldown_ms']:
+                # Registrar evento
+                # Evitar duplicados en la misma fecha/hora (redondeando a segundos)
+                if len(motion_events_ms) == 0 or abs(motion_start_time - motion_events_ms[-1]) >= config['cooldown_ms']:
+                    motion_events_ms.append(motion_start_time)
+                    last_event_registered_time = motion_start_time
+                    logger.info(f"✓ Evento registrado en {motion_start_time:.0f}ms (cooldown: {(motion_start_time - (last_event_registered_time if last_event_registered_time else 0)):.0f}ms)")
+                else:
+                    logger.debug(f"✗ Evento duplicado/omito en {motion_start_time:.0f}ms")
+            else:
+                logger.debug(f"✗ Evento ignorado en {motion_start_time:.0f}ms (cooldown insuficiente: {(motion_start_time - last_event_registered_time):.0f}ms < {config['cooldown_ms']}ms)")
 
     cap.release()
     logger.info(f"Análisis completado. Eventos: {len(motion_events_ms)}")
@@ -622,7 +637,9 @@ def create_clip_from_event(video_path, event_ms, clip_duration_ms=16000, roi_coo
             clip_h264_path
         ]
         
-        result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+        # Usar CREATE_NO_WINDOW flag para evitar que aparezca la ventana de terminal
+        creation_flags = 0x08000000 if sys.platform == 'win32' else 0
+        result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, creationflags=creation_flags)
         
         if result.returncode == 0 and os.path.exists(clip_h264_path):
             # Eliminar clip original mp4v y usar el H.264

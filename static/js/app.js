@@ -23,10 +23,15 @@ let completedNotificationShown = false;
 
 // Cargar vista según el botón del sidebar
 function loadView(viewName, evt) {
-    // Limpiar flag de completado si estamos saliendo de la vista de proceso
+    // Limpiar flag de completado y detener polling si estamos saliendo de la vista de proceso
     if (appState.currentView === 'process' && viewName !== 'process') {
-        console.log('🔄 Saliendo de la vista de análisis - limpiando flag de completado...');
+        console.log('🔄 Saliendo de la vista de análisis - limpiando flag de completado y deteniendo polling...');
         clearCompletedFlagSilent();
+        completedNotificationShown = false;
+        if (typeof processingPollingInterval !== 'undefined' && processingPollingInterval) {
+            clearInterval(processingPollingInterval);
+            processingPollingInterval = null;
+        }
     }
     
     // Actualizar botones activos
@@ -1998,7 +2003,7 @@ async function showProcessView() {
         // Verificar estado normal - NO mostrar completado automáticamente al entrar a la vista
         // Dar un pequeño delay para que el servidor actualice el estado después de limpiar el flag
         setTimeout(() => {
-            checkProcessingStatus(false); // false = no mostrar completado automáticamente
+            checkProcessingStatus();
         }, 500);
     }
 }
@@ -3761,8 +3766,8 @@ function drawVideoFrame() {
         roiCtx.lineWidth = 3;
         roiCtx.strokeRect(currentROI.x, currentROI.y, currentROI.w, currentROI.h);
         
-        // Dibujar área semi-transparente fuera del ROI
-        roiCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        // Dibujar área semi-transparente fuera del ROI (menos opaco)
+        roiCtx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         roiCtx.fillRect(0, 0, roiCanvas.width, currentROI.y);
         roiCtx.fillRect(0, currentROI.y, currentROI.x, currentROI.h);
         roiCtx.fillRect(currentROI.x + currentROI.w, currentROI.y, roiCanvas.width - currentROI.x - currentROI.w, currentROI.h);
@@ -4105,8 +4110,15 @@ function showROISelectionForProcessing(folderPath, uploadedFiles) {
                         </div>
                     </div>
                     
-                    <div class="video-controls" style="margin-top: 15px;" id="videoControlsProcessing" style="display:none;">
-                        <input type="range" id="videoProcessingSeekBar" min="0" max="100" value="0" style="flex: 1;">
+                    <div class="video-controls" style="margin-top: 15px; display: none;" id="videoControlsProcessing">
+                        <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">
+                                <i class="fas fa-film"></i> Frame:
+                            </span>
+                            <input type="range" id="videoProcessingSeekBar" min="0" max="100" value="0" 
+                                   style="flex: 1;" oninput="seekProcessingVideoFrame(this.value)">
+                            <span id="frameNumberDisplay" style="font-size: 0.85rem; color: var(--text-secondary); min-width: 50px; text-align: right;">1 / 1</span>
+                        </div>
                     </div>
                 </div>
                 
@@ -4392,7 +4404,7 @@ function loadProcessingROIVideo(videoFileName) {
     
     console.log('📁 Session folder:', sessionFolder);
     
-    // Solicitar generación de preview ligero
+    // Solicitar generación del frame para preview
     fetch(buildApiUrl('/api/generate-roi-preview'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4407,22 +4419,191 @@ function loadProcessingROIVideo(videoFileName) {
             throw new Error(data.error || 'Error generando preview');
         }
         
-        console.log('✅ Preview generado:', data.preview_filename, `(${data.preview_size_mb || '?'}MB)`);
+        console.log(`✅ Frame generado para ROI: ${data.preview_id}`);
         
-        // Ahora cargar el preview (mucho más pequeño y rápido)
-        loadProcessingROIVideoElement(data.preview_url);
+        // Guardar info globalmente
+        window.currentPreviewId = data.preview_id;
+        window.currentTotalFrames = 1;
+        window.currentFrameIndex = 0;
+        
+        // Cargar el frame usando el endpoint API
+        const frameUrl = buildApiUrl(`/api/get-roi-frame/${data.preview_id}`);
+        console.log('📥 Cargando frame desde:', frameUrl);
+        
+        const img = new Image();
+        
+        img.onload = function() {
+            console.log('✅ Frame cargado exitosamente');
+            console.log('🎨 Tamaño de imagen:', img.width, 'x', img.height);
+            
+            // Guardar imagen globalmente para poder redibujarla
+            window.currentROIImage = img;
+            
+            // Ajustar canvas al tamaño de la imagen (respetando max 1000x600)
+            const scale = Math.min(1000 / img.width, 600 / img.height, 1);
+            const displayWidth = Math.floor(img.width * scale);
+            const displayHeight = Math.floor(img.height * scale);
+            
+            // Configurar tamaño del canvas (sin escalar por devicePixelRatio para evitar blur)
+            canvas.width = displayWidth;
+            canvas.height = displayHeight;
+            canvas.style.width = displayWidth + 'px';
+            canvas.style.height = displayHeight + 'px';
+            
+            console.log('🎨 Canvas ajustado a:', canvas.width, 'x', canvas.height, 'Escala:', scale);
+            
+            // Dibujar imagen en canvas (sin ROI inicial)
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Ocultar loader y mostrar canvas
+            const loader = document.getElementById('videoLoadingIndicator');
+            if (loader) loader.style.display = 'none';
+            
+            // Mostrar canvas e instrucciones
+            canvas.style.display = 'block';
+            const instructions = document.getElementById('canvasInstructions');
+            if (instructions) instructions.style.display = 'flex';
+            
+            // Ocultar controles de video (ya no hay navegación entre frames)
+            const controls = document.getElementById('videoControlsProcessing');
+            if (controls) controls.style.display = 'none';
+            
+            // Habilitar sidebar
+            const sidebar = document.getElementById('roiProcessingSidebar');
+            if (sidebar) {
+                sidebar.style.opacity = '1';
+                sidebar.style.pointerEvents = 'auto';
+            }
+            
+            // Actualizar paso
+            const steps = document.querySelectorAll('.step');
+            if (steps[0]) steps[0].querySelector('.step-label').textContent = 'Frame cargado';
+            if (steps[1]) steps[1].classList.add('active');
+            
+            // Inicializar coordenadas con el tamaño completo de la imagen real
+            // (Esto disparará oninput y dibujará el ROI automáticamente)
+            document.getElementById('roiProcessingX').value = 0;
+            document.getElementById('roiProcessingY').value = 0;
+            document.getElementById('roiProcessingW').value = img.naturalWidth;
+            document.getElementById('roiProcessingH').value = img.naturalHeight;
+            
+            // Actualizar mensaje de carga
+            if (loadingMsg) loadingMsg.textContent = 'Frame cargado';
+            if (loadingSubtext) loadingSubtext.textContent = 'Selecciona la zona a analizar';
+        };
+        
+        img.onerror = function() {
+            console.error('❌ Error cargando frame');
+            if (loadingMsg) loadingMsg.textContent = 'Error al cargar frame';
+            if (loadingSubtext) loadingSubtext.textContent = 'No se pudo cargar la imagen';
+        };
+        
+        img.src = frameUrl;
     })
     .catch(error => {
         console.error('❌ Error generando preview:', error);
-        showNotification('Error al generar preview: ' + error.message, 'error');
-        
-        // Fallback: cargar video original
-        const encodedFileName = encodeURIComponent(videoFileName);
-        const videoPath = `/uploads/${sessionFolder}/${encodedFileName}`;
-        console.log('⚠️ Cargando video original como fallback:', videoPath);
-        loadProcessingROIVideoElement(videoPath);
+        const loadingMsg = document.getElementById('loadingMessage');
+        const loadingSubtext = document.getElementById('loadingSubtext');
+        if (loadingMsg) loadingMsg.textContent = 'Error al generar preview';
+        if (loadingSubtext) loadingSubtext.textContent = error.message;
     });
 }
+
+// Cargar un frame específico en el canvas
+function loadROIFrame(canvas, ctx, previewId, frameIndex) {
+    console.log(`📸 Cargando frame ${frameIndex}...`);
+    
+    const img = new Image();
+    
+    img.onload = function() {
+        console.log('✅ Frame cargado exitosamente');
+        console.log('🎨 Tamaño de imagen:', img.width, 'x', img.height);
+        
+        // Ajustar canvas al tamaño de la imagen (respetando max 1000x600)
+        const scale = Math.min(1000 / img.width, 600 / img.height, 1);
+        canvas.width = Math.floor(img.width * scale);
+        canvas.height = Math.floor(img.height * scale);
+        
+        console.log('🎨 Canvas ajustado a:', canvas.width, 'x', canvas.height, 'Escala:', scale);
+        
+        // Dibujar imagen en canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Redibujar ROI si existe
+        if (window.currentROI) {
+            updateProcessingROIPreview();
+        }
+        
+        // Ocultar loader y mostrar canvas (solo primera vez)
+        const loader = document.getElementById('videoLoadingIndicator');
+        if (loader && loader.style.display !== 'none') {
+            loader.style.display = 'none';
+            
+            // Mostrar canvas e instrucciones
+            canvas.style.display = 'block';
+            const instructions = document.getElementById('canvasInstructions');
+            if (instructions) instructions.style.display = 'flex';
+            
+            // Mostrar controles de video
+            const controls = document.getElementById('videoControlsProcessing');
+            if (controls) {
+                controls.style.display = 'flex';
+                console.log('✓ Controles de video mostrados');
+            }
+            
+            // Habilitar sidebar
+            const sidebar = document.getElementById('roiProcessingSidebar');
+            if (sidebar) {
+                sidebar.style.opacity = '1';
+                sidebar.style.pointerEvents = 'auto';
+            }
+            
+            // Actualizar paso
+            const steps = document.querySelectorAll('.step');
+            if (steps[0]) steps[0].querySelector('.step-label').textContent = 'Frames cargados';
+            if (steps[1]) steps[1].classList.add('active');
+            
+            // Inicializar coordenadas con el tamaño completo
+            document.getElementById('roiProcessingX').value = 0;
+            document.getElementById('roiProcessingY').value = 0;
+            document.getElementById('roiProcessingW').value = canvas.width;
+            document.getElementById('roiProcessingH').value = canvas.height;
+        }
+        
+        // Actualizar seekbar y contador
+        const seekBar = document.getElementById('videoProcessingSeekBar');
+        const frameDisplay = document.getElementById('frameNumberDisplay');
+        if (seekBar) {
+            seekBar.max = window.currentTotalFrames - 1;
+            seekBar.value = frameIndex;
+        }
+        if (frameDisplay) {
+            frameDisplay.textContent = `${frameIndex + 1} / ${window.currentTotalFrames}`;
+        }
+    };
+    
+    img.onerror = function() {
+        console.error('❌ Error cargando frame:', frameIndex);
+        showNotification('Error al cargar frame', 'error');
+    };
+    
+    img.src = buildApiUrl(`/api/get-roi-frame/${previewId}/${frameIndex}`);
+}
+
+// Función para cambiar de frame con el slider
+window.seekProcessingVideoFrame = function(value) {
+    const frameIndex = parseInt(value);
+    if (window.currentPreviewId && frameIndex >= 0 && frameIndex < window.currentTotalFrames) {
+        window.currentFrameIndex = frameIndex;
+        const canvas = document.getElementById('roiProcessingCanvas');
+        const ctx = canvas ? canvas.getContext('2d') : null;
+        if (canvas && ctx) {
+            loadROIFrame(canvas, ctx, window.currentPreviewId, frameIndex);
+        }
+    }
+};
 
 function loadProcessingROIVideoElement(videoUrl) {
     console.log('🎥 Cargando video element con URL:', videoUrl);
@@ -4485,9 +4666,12 @@ function loadProcessingROIVideoElement(videoUrl) {
         const instructions = document.getElementById('canvasInstructions');
         if (instructions) instructions.style.display = 'flex';
         
-        // Mostrar controles
+        // Mostrar controles de video
         const controls = document.getElementById('videoControlsProcessing');
-        if (controls) controls.style.display = 'flex';
+        if (controls) {
+            controls.style.display = 'flex';
+            console.log('✓ Controles de video mostrados');
+        }
         
         // Habilitar sidebar
         const sidebar = document.getElementById('roiProcessingSidebar');
@@ -4667,6 +4851,8 @@ function initProcessingROICanvas() {
     
     // NO clonar - solo agregar eventos directamente
     canvas.addEventListener('mousedown', function(e) {
+        if (!window.currentROIImage) return;
+        
         const rect = canvas.getBoundingClientRect();
         // Convertir coordenadas del navegador a coordenadas del canvas interno
         const scaleX = canvas.width / rect.width;
@@ -4674,15 +4860,14 @@ function initProcessingROICanvas() {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
         
-        console.log('🖱️ Mouse down - Browser:', e.clientX - rect.left, e.clientY - rect.top);
-        console.log('🖱️ Mouse down - Canvas:', x, y, '| Scale:', scaleX, scaleY);
+        console.log('🖱️ Mouse down - Canvas:', x, y);
         isDrawing = true;
         startX = x;
         startY = y;
     });
     
     canvas.addEventListener('mousemove', function(e) {
-        if (!isDrawing) return;
+        if (!isDrawing || !window.currentROIImage) return;
         
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -4690,20 +4875,21 @@ function initProcessingROICanvas() {
         const currentX = (e.clientX - rect.left) * scaleX;
         const currentY = (e.clientY - rect.top) * scaleY;
         
-        // Redibujar frame
-        captureProcessingFrame();
-        
-        // Dibujar rectángulo temporal
+        // Limpiar y redibujar imagen
         const ctx = processingROICtx;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(window.currentROIImage, 0, 0, canvas.width, canvas.height);
+        
+        // Dibujar rectángulo temporal (línea punteada más fina)
         ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
         ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
         ctx.setLineDash([]);
     });
     
     canvas.addEventListener('mouseup', function(e) {
-        if (!isDrawing) return;
+        if (!isDrawing || !window.currentROIImage) return;
         
         console.log('🖱️ Mouse up - finalizando selección');
         isDrawing = false;
@@ -4714,29 +4900,26 @@ function initProcessingROICanvas() {
         const endX = (e.clientX - rect.left) * scaleX;
         const endY = (e.clientY - rect.top) * scaleY;
         
-        console.log('🖱️ Mouse up - Canvas:', endX, endY);
+        // Calcular escala entre canvas y imagen real
+        const imageScale = canvas.width / window.currentROIImage.naturalWidth;
         
-        // Convertir coordenadas de canvas a coordenadas de video
-        const videoScale = parseFloat(canvas.dataset.videoScale) || 1;
-        const offsetX = parseFloat(canvas.dataset.videoOffsetX) || 0;
-        const offsetY = parseFloat(canvas.dataset.videoOffsetY) || 0;
-        
-        const videoX = Math.round((Math.min(startX, endX) - offsetX) / videoScale);
-        const videoY = Math.round((Math.min(startY, endY) - offsetY) / videoScale);
-        const videoW = Math.round(Math.abs(endX - startX) / videoScale);
-        const videoH = Math.round(Math.abs(endY - startY) / videoScale);
+        // Convertir coordenadas de canvas a coordenadas de imagen real
+        const imageX = Math.round(Math.min(startX, endX) / imageScale);
+        const imageY = Math.round(Math.min(startY, endY) / imageScale);
+        const imageW = Math.round(Math.abs(endX - startX) / imageScale);
+        const imageH = Math.round(Math.abs(endY - startY) / imageScale);
         
         console.log('📐 ROI en canvas:', Math.min(startX, endX), Math.min(startY, endY), Math.abs(endX - startX), Math.abs(endY - startY));
-        console.log('📐 ROI en video:', videoX, videoY, videoW, videoH);
-        console.log('📐 Offset y escala:', offsetX, offsetY, videoScale);
+        console.log('📐 ROI en imagen real:', imageX, imageY, imageW, imageH);
+        console.log('📐 Escala:', imageScale);
         
         // Actualizar inputs
-        document.getElementById('roiProcessingX').value = Math.max(0, videoX);
-        document.getElementById('roiProcessingY').value = Math.max(0, videoY);
-        document.getElementById('roiProcessingW').value = videoW;
-        document.getElementById('roiProcessingH').value = videoH;
+        document.getElementById('roiProcessingX').value = Math.max(0, imageX);
+        document.getElementById('roiProcessingY').value = Math.max(0, imageY);
+        document.getElementById('roiProcessingW').value = imageW;
+        document.getElementById('roiProcessingH').value = imageH;
         
-        // Actualizar preview
+        // Actualizar preview (redibuja con ROI definitivo)
         updateProcessingROIPreview();
     });
     
@@ -4744,22 +4927,29 @@ function initProcessingROICanvas() {
 }
 
 function updateProcessingROIPreview() {
-    if (!processingROICanvas || !processingROIVideo) return;
+    if (!processingROICanvas || !processingROICtx) return;
     
-    // Solo redibujar si el video ya está cargado
-    if (processingROIVideo.readyState < 2) {
-        console.log('⏳ Video aún no está listo para preview');
+    const canvas = processingROICanvas;
+    const ctx = processingROICtx;
+    
+    // Si no hay imagen cargada, no hacer nada
+    if (!window.currentROIImage) {
+        console.log('⏳ Imagen aún no está cargada');
         return;
     }
     
-    // Redibujar frame actual
-    captureProcessingFrame();
+    // ✅ CRÍTICO: Limpiar canvas y redibujar la imagen completa
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(window.currentROIImage, 0, 0, canvas.width, canvas.height);
     
-    // Obtener dimensiones del video
-    const videoWidth = processingROIVideo.videoWidth;
-    const videoHeight = processingROIVideo.videoHeight;
+    // Obtener dimensiones reales del video (no del canvas)
+    const videoWidth = window.currentROIImage.naturalWidth;
+    const videoHeight = window.currentROIImage.naturalHeight;
     
-    // Obtener coordenadas
+    // Calcular escala (el canvas puede ser más pequeño que la imagen)
+    const scale = Math.min(canvas.width / videoWidth, canvas.height / videoHeight);
+    
+    // Obtener coordenadas del ROI (en píxeles del video original)
     let x = parseInt(document.getElementById('roiProcessingX').value) || 0;
     let y = parseInt(document.getElementById('roiProcessingY').value) || 0;
     let w = parseInt(document.getElementById('roiProcessingW').value) || 0;
@@ -4802,36 +4992,31 @@ function updateProcessingROIPreview() {
         document.getElementById('roiProcessingH').value = h;
     }
     
-    // Convertir coordenadas de video a canvas
-    const canvas = processingROICanvas;
-    const scale = parseFloat(canvas.dataset.videoScale) || 1;
-    const offsetX = parseFloat(canvas.dataset.videoOffsetX) || 0;
-    const offsetY = parseFloat(canvas.dataset.videoOffsetY) || 0;
+    // Guardar ROI actualizado
+    window.currentROI = [x, y, w, h];
     
-    const canvasX = x * scale + offsetX;
-    const canvasY = y * scale + offsetY;
+    // Convertir coordenadas del video a coordenadas del canvas
+    const canvasX = x * scale;
+    const canvasY = y * scale;
     const canvasW = w * scale;
     const canvasH = h * scale;
     
-    // Dibujar ROI
-    const ctx = processingROICtx;
+    // Dibujar ROI con línea verde (usar translate de 0.5px para líneas nítidas)
+    ctx.save();
+    ctx.translate(0.5, 0.5);
     ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(canvasX, canvasY, canvasW, canvasH);
-    
-    // Dibujar etiqueta
-    ctx.fillStyle = '#00ff00';
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(`ROI: ${w}x${h}`, canvasX + 5, canvasY - 5);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(Math.floor(canvasX), Math.floor(canvasY), Math.floor(canvasW), Math.floor(canvasH));
+    ctx.restore();
 }
 
 function resetProcessingROI() {
-    if (!processingROIVideo) return;
+    if (!window.currentROIImage) return;
     
     document.getElementById('roiProcessingX').value = 0;
     document.getElementById('roiProcessingY').value = 0;
-    document.getElementById('roiProcessingW').value = processingROIVideo.videoWidth;
-    document.getElementById('roiProcessingH').value = processingROIVideo.videoHeight;
+    document.getElementById('roiProcessingW').value = window.currentROIImage.naturalWidth;
+    document.getElementById('roiProcessingH').value = window.currentROIImage.naturalHeight;
     
     updateProcessingROIPreview();
 }
@@ -5255,6 +5440,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Exportar funciones globales necesarias
 window.loadView = loadView;
+
+// Cierre final para evitar errores de sintaxis
 
 
 

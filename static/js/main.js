@@ -13,7 +13,7 @@ function showNotification(message, type = 'info', duration = 4000) {
     // Estilos inline para la notificación
     notification.style.cssText = `
         position: fixed;
-        top: 20px;
+        top: 70px;
         right: 20px;
         padding: 15px 20px;
         background-color: ${getNotificationColor(type)};

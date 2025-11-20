@@ -344,14 +344,35 @@ def load_motion_detection_config(db_path=None):
     try:
         conn = create_db_connection(db_path)
         cursor = conn.cursor()
-        
+        # Verificar si la tabla existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='configuracion_deteccion'")
+        table_exists = cursor.fetchone()
+        if not table_exists:
+            logger.warning("La tabla 'configuracion_deteccion' no existe. Creando tabla y configuración por defecto...")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS configuracion_deteccion (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    threshold_percentage REAL NOT NULL DEFAULT 1.0,
+                    var_threshold INTEGER NOT NULL DEFAULT 16,
+                    cooldown_ms INTEGER NOT NULL DEFAULT 6000,
+                    fecha_actualizacion TEXT NOT NULL,
+                    activa INTEGER NOT NULL DEFAULT 1
+                );
+            """)
+            # Insertar configuración por defecto (cooldown_ms=6000)
+            fecha_actualizacion = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            cursor.execute(
+                "INSERT INTO configuracion_deteccion (threshold_percentage, var_threshold, cooldown_ms, fecha_actualizacion, activa) VALUES (?, ?, ?, ?, 1)",
+                (1.0, 16, 6000, fecha_actualizacion)
+            )
+            conn.commit()
+            logger.info("Tabla y configuración por defecto creadas correctamente.")
         # Buscar la configuración activa más reciente
         cursor.execute(
             "SELECT threshold_percentage, var_threshold, cooldown_ms FROM configuracion_deteccion WHERE activa = 1 ORDER BY id DESC LIMIT 1"
         )
         result = cursor.fetchone()
         conn.close()
-        
         if result:
             threshold_percentage, var_threshold, cooldown_ms = result
             logger.info(f"Configuración cargada desde BD: threshold_percentage={threshold_percentage}, var_threshold={var_threshold}, cooldown_ms={cooldown_ms}")
@@ -364,8 +385,15 @@ def load_motion_detection_config(db_path=None):
                 'binary_threshold': 127                # Siempre incluir parámetros técnicos
             }
         else:
-            logger.info("No se encontró configuración en BD, usando valores por defecto")
-            return None
+            logger.info("No se encontró configuración en BD, usando valores por defecto (cooldown_ms=6000)")
+            return {
+                'threshold_percentage': 1.0,
+                'var_threshold': 16,
+                'cooldown_ms': 6000,
+                'gaussian_blur': (5, 5),
+                'morph_kernel_size': (3, 3),
+                'binary_threshold': 127
+            }
     except Exception as e:
         logger.error(f"Error al cargar configuración: {e}")
         return None
