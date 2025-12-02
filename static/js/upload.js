@@ -118,7 +118,7 @@ function handleFiles(files) {
     });
     
     if (videoFiles.length === 0) {
-        showNotification('Por favor selecciona archivos de video válidos', 'warning');
+        showNotification(t('selecciona_archivos_validos'), 'warning');
         return;
     }
     
@@ -150,7 +150,7 @@ uploadBtn.addEventListener('click', async () => {
     
     if (selectedFiles.length === 0) {
         console.log('⚠️ No hay archivos seleccionados');
-        showNotification('No hay archivos seleccionados', 'warning');
+        showNotification(t('no_hay_archivos_seleccionados'), 'warning');
         return;
     }
     
@@ -385,7 +385,7 @@ uploadBtn.addEventListener('click', async () => {
         currentFolderId = folderId;
         
         console.log(`🎉 [UPLOAD] SUBIDA COMPLETA - ${uploadedFiles.length} archivos subidos`);
-        showNotification(`${uploadedFiles.length} video(s) subidos correctamente`, 'success');
+        showNotification(`${uploadedFiles.length} ${t('videos_subidos_correctamente')}`, 'success');
         
         // Mostrar sección de ROI después de 1 segundo
         setTimeout(() => {
@@ -420,7 +420,7 @@ uploadBtn.addEventListener('click', async () => {
 // Start processing button
 startProcessingBtn.addEventListener('click', async () => {
     if (!currentFolderId) {
-        showNotification('No hay carpeta seleccionada', 'error');
+        showNotification(t('no_hay_carpeta_seleccionada'), 'error');
         return;
     }
     
@@ -452,7 +452,7 @@ startProcessingBtn.addEventListener('click', async () => {
         const data = await response.json();
         
         if (data.success) {
-            showNotification('Procesamiento iniciado. Redirigiendo al estado de análisis...', 'success');
+            showNotification(t('procesamiento_iniciado'), 'success');
             
             // Redirigir inmediatamente a la vista de Estado de Análisis
             // Agregar parámetro 'processing=starting' para indicar que acaba de empezar
@@ -464,7 +464,7 @@ startProcessingBtn.addEventListener('click', async () => {
         }
     } catch (error) {
         console.error('Error:', error);
-        showNotification('Error al iniciar procesamiento: ' + error.message, 'error');
+        showNotification(t('error_iniciar_procesamiento') + ': ' + error.message, 'error');
         startProcessingBtn.disabled = false;
         roiSection.style.display = 'block';
     }
@@ -495,7 +495,7 @@ function startStatusPolling() {
 }
 
 function onProcessingComplete() {
-    showNotification('¡Procesamiento completado! Redirigiendo al dashboard...', 'success');
+    showNotification(t('procesamiento_completado'), 'success');
     
     setTimeout(() => {
         // Redirigir al dashboard y forzar recarga de datos

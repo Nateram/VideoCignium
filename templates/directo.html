@@ -1,13 +1,13 @@
 {% extends "base_simple.html" %}
-{% block title %}Análisis en Directo - Detector de Movimiento{% endblock %}
+{% block title %}<span data-i18n="analisis_directo">Análisis en Directo</span> - <span data-i18n="detector_movimiento_ia">Detector de Movimiento</span>{% endblock %}
 {% block content %}
 <!-- Banner de desarrollo -->
 <div style="background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
     <div style="display: flex; align-items: center; gap: 16px;">
         <span style="font-size: 2.5em;">🚧</span>
         <div>
-            <h3 style="margin: 0; color: #fff; font-size: 1.3em; font-weight: 600;">Apartado en Desarrollo</h3>
-            <p style="margin: 8px 0 0 0; color: #fff; opacity: 0.95; font-size: 1.05em;">
+            <h3 style="margin: 0; color: #fff; font-size: 1.3em; font-weight: 600;" data-i18n="apartado_desarrollo">Apartado en Desarrollo</h3>
+            <p style="margin: 8px 0 0 0; color: #fff; opacity: 0.95; font-size: 1.05em;" data-i18n="demo_procesamiento">
                 Esta sección es una <strong>demo de procesamiento en tiempo real personal</strong>. Las funcionalidades están en fase de pruebas y desarrollo.
             </p>
         </div>
@@ -16,19 +16,19 @@
 
 <div class="directo-container" style="display: flex; gap: 32px; margin-top: 40px;">
     <div style="flex: 2;">
-        <h2>Stream en Directo</h2>
+        <h2 data-i18n="stream_directo">Stream en Directo</h2>
         <img id="directoStream" src="http://localhost:8080/video_feed" width="640" height="480" style="border-radius: 12px; border: 3px solid #3B82F6;">
         <div style="margin-top: 18px;">
-            <label>ROI (x, y, w, h):</label>
+            <label data-i18n="roi_config">ROI (x, y, w, h):</label>
             <input type="number" id="roiX" value="0" style="width:60px;">
             <input type="number" id="roiY" value="0" style="width:60px;">
             <input type="number" id="roiW" value="640" style="width:60px;">
             <input type="number" id="roiH" value="480" style="width:60px;">
-            <button class="btn" onclick="startDirectoAnalysis()">Iniciar Análisis</button>
+            <button class="btn" onclick="startDirectoAnalysis()" data-i18n="iniciar_analisis">Iniciar Análisis</button>
         </div>
     </div>
     <div style="flex: 1; background: #1e293b; border-radius: 12px; padding: 18px; color: #fff; min-width: 260px;">
-        <h3>Logs de Eventos</h3>
+        <h3 data-i18n="logs_eventos">Logs de Eventos</h3>
         <div id="directoLogs" style="height: 400px; overflow-y: auto; background: #222; border-radius: 8px; padding: 10px; font-size: 1.05em;"></div>
     </div>
 </div>

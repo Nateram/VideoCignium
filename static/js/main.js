@@ -115,21 +115,21 @@ window.formatFileSize = formatFileSize;
 // Función para finalizar sesión (eliminar todos los archivos y datos)
 async function endSession() {
     // Confirmar acción
-    const confirmed = confirm(
+    const confirmed = confirm(t('finalizar_sesion_confirm',
         '⚠️ ¿Estás seguro de que quieres finalizar la sesión?\n\n' +
         'Esto eliminará:\n' +
         '• Todos los videos subidos\n' +
         '• Todos los clips generados\n' +
         '• Toda la base de datos\n\n' +
         'Asegúrate de haber descargado los informes y clips que necesites antes de continuar.'
-    );
+    ));
     
     if (!confirmed) {
         return;
     }
     
     try {
-        showNotification('🧹 Limpiando sesión...', 'info');
+        showNotification(t('limpiando_sesion', '🧹 Limpiando sesión...'), 'info');
         
         const response = await fetch(buildApiUrl('/api/session/cleanup'), {
             method: 'POST',
@@ -141,18 +141,18 @@ async function endSession() {
         const data = await response.json();
         
         if (data.success) {
-            showNotification('✅ Sesión finalizada. Todos los archivos fueron eliminados.', 'success', 5000);
+            showNotification(t('sesion_finalizada', '✅ Sesión finalizada. Todos los archivos fueron eliminados.'), 'success', 5000);
             
             // Recargar página después de 2 segundos
             setTimeout(() => {
                 window.location.reload();
             }, 2000);
         } else {
-            showNotification(`❌ Error al finalizar sesión: ${data.error}`, 'error', 6000);
+            showNotification(`${t('error_finalizar_sesion', '❌ Error al finalizar sesión: ')}${data.error}`, 'error', 6000);
         }
     } catch (error) {
         console.error('Error al finalizar sesión:', error);
-        showNotification('❌ Error de conexión al finalizar sesión', 'error');
+        showNotification(t('error_conexion_finalizar', '❌ Error de conexión al finalizar sesión'), 'error');
     }
 }
 
@@ -171,7 +171,7 @@ document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
         // Usuario cambió de pestaña - iniciar timeout de 1 hora
         inactivityTimeout = setTimeout(async () => {
-            console.log('⏰ Sesión inactiva por 1 hora, limpiando...');
+            console.log(t('sesion_inactiva', '⏰ Sesión inactiva por 1 hora, limpiando...'));
             // Limpiar sesión automáticamente
             await fetch(buildApiUrl('/api/session/cleanup'), {
                 method: 'POST',

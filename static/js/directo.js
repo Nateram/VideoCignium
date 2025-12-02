@@ -16,7 +16,7 @@ window.captureLiveFrame = async function() {
     // Asegurarse de que el canvas está renderizado
     const canvas = document.getElementById('roiProcessingCanvas');
     if (!canvas) {
-        showNotification('No se encontró el canvas para mostrar el frame. Recarga la pestaña de configuración.', 'error');
+        showNotification(t('no_encontro_canvas'), 'error');
         return;
     }
     const streamUrl = document.getElementById('streamUrlInput').value;
@@ -57,7 +57,7 @@ window.captureLiveFrame = async function() {
         };
         img.src = imgUrl;
     } catch (err) {
-        showNotification('Error al capturar frame del directo', 'error');
+        showNotification(t('error_capturar_frame'), 'error');
     }
 };
 
@@ -65,7 +65,7 @@ window.captureLiveFrame = async function() {
 function startLiveAnalysis() {
     const streamUrl = document.getElementById('streamUrlInput').value;
     if (!roi) {
-        showNotification('Confirma primero la zona de interés (ROI)', 'warning');
+        showNotification(t('confirma_roi_primero'), 'warning');
         return;
     }
     fetch(buildApiUrl('/api/live/start'), {
@@ -79,7 +79,7 @@ function startLiveAnalysis() {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            showNotification('Análisis en directo iniciado', 'success');
+            showNotification(t('analisis_directo_iniciado'), 'success');
             startLiveLogsPolling();
         } else {
             showNotification('Error: ' + data.error, 'error');
