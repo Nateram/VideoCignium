@@ -9,13 +9,13 @@
     <title>{% block title %}Detector de Movimiento en Punto Caliente - Análisis Inteligente{% endblock %}</title>
     
     <!-- CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20251112-v8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20251202-lang-fix">
     
-    <!-- Font Awesome para iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Font Awesome para iconos (offline) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome.min.css') }}">
     
-    <!-- Handsontable CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@14.0.0/dist/handsontable.full.min.css">
+    <!-- Handsontable CSS (offline) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/handsontable/handsontable.full.min.css') }}">
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -45,74 +45,70 @@
         <!-- Sidebar izquierdo (réplica exacta de la app desktop) -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2>Panel de Control</h2>
+                <h2 data-i18n="panel_control">Panel de Control</h2>
             </div>
             
             <nav class="sidebar-content">
                 <!-- Sección Datos -->
                 <div class="sidebar-section">
-                    <div class="section-title">
+                    <div class="section-title" data-i18n="datos">
                         DATOS
                     </div>
                     <button class="sidebar-btn" onclick="loadView('folders', event)">
                         <span>📂</span>
-                        <span>Carpetas y Videos</span>
+                        <span data-i18n="carpetas_videos">Carpetas y Videos</span>
                     </button>
                 </div>
                 
                 <!-- Sección Análisis -->
                 <div class="sidebar-section">
-                    <div class="section-title">
+                    <div class="section-title" data-i18n="analisis">
                         ANÁLISIS
                     </div>
                     <button class="sidebar-btn" onclick="loadView('select-folder', event)">
                         <span>➕</span>
-                        <span>Seleccionar Carpeta</span>
+                        <span data-i18n="seleccionar_carpeta">Seleccionar Carpeta</span>
                     </button>
                     <button class="sidebar-btn" onclick="loadView('select-video', event)">
                         <span>📹</span>
-                        <span>Seleccionar Video</span>
+                        <span data-i18n="seleccionar_video">Seleccionar Video</span>
                     </button>
                     <button class="sidebar-btn" onclick="loadView('process', event)" id="statusAnalysisBtn">
                         <span id="statusAnalysisIcon">📊</span>
-                        <span>Estado de Análisis</span>
+                        <span data-i18n="estado_analisis">Estado de Análisis</span>
                         <span class="analysis-spinner" id="analysisSpinner" style="display: none;">
                             <i class="fas fa-circle-notch fa-spin"></i>
                         </span>
-                    </button>
-                    <button class="sidebar-btn" onclick="loadView('directo', event)">
-                        <span>📡</span>
-                        <span>Análisis en Directo</span>
                     </button>
                 </div>
                 
                 <!-- Sección Configuración -->
                 <div class="sidebar-section">
-                    <div class="section-title">
+                    <div class="section-title" data-i18n="configuracion">
                         CONFIGURACIÓN
                     </div>
                     <button class="sidebar-btn" onclick="loadView('roi-config', event)">
                         <span>🕐</span>
-                        <span>Configurar Zona Hora</span>
+                        <span data-i18n="configurar_zona_hora">Configurar Zona Hora</span>
                     </button>
                     <button class="sidebar-btn" onclick="loadView('advanced', event)">
                         <span>⚙️</span>
-                        <span>Configuración Avanzada</span>
+                        <span data-i18n="configuracion_avanzada">Configuración Avanzada</span>
                     </button>
                 </div>
                 
                 <!-- Sección Información -->
                 <div class="sidebar-section">
-                    <div class="section-title">
+                    <div class="section-title" data-i18n="informacion">
                         INFORMACIÓN
                     </div>
                     <button class="sidebar-btn" onclick="loadView('excel', event)">
                         <span><i class="fas fa-file-excel"></i></span>
-                        <span>Excel</span>
+                        <span data-i18n="excel">Excel</span>
                     </button>
                     <button class="sidebar-btn" onclick="loadView('help', event)">
                         <span>❓</span>
-                        <span>Ayuda</span>
+                        <span data-i18n="ayuda">Ayuda</span>
                     </button>
                 </div>
             </nav>
@@ -128,12 +124,17 @@
             <!-- Barra superior mejorada -->
             <div class="top-bar">
                 <div class="top-bar-left">
-                    <h2 id="view-title">Detector de Movimiento IA</h2>
+                    <h2 id="view-title" data-i18n="detector_movimiento_ia">Detector de Movimiento IA</h2>
                 </div>
                 <div class="top-bar-actions">
-                    <button class="btn-top-bar" onclick="loadView('logs', event)" title="Ver logs del sistema">
+                    <!-- Selector de idioma simple y funcional -->
+                    <select class="lang-select" id="lang-select" onchange="if(typeof changeLanguage==='function')changeLanguage(this.value)">
+                        <option value="en">🇺🇸 English</option>
+                        <option value="es">🇪🇸 Español</option>
+                    </select>
+                    <button class="btn-top-bar" onclick="loadView('logs', event)" title="Ver logs del sistema" data-i18n-title="logs_sistema">
                         <i class="fas fa-file-alt"></i>
-                        <span>Logs del Sistema</span>
+                        <span data-i18n="logs_sistema">Logs del Sistema</span>
                     </button>
                 </div>
             </div>
@@ -147,7 +148,7 @@
 
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='libs/chart.js') }}"></script>
     <!-- Config global (debe cargarse PRIMERO) -->
     <script src="{{ url_for('static', filename='js/config.js') }}?v=20251110-nocache"></script>
     
@@ -162,10 +163,11 @@
     
     <!-- Scripts de la aplicación -->
     <script src="{{ url_for('static', filename='js/main.js') }}?v=20251110-nocache"></script>
-    <script src="{{ url_for('static', filename='js/directo.js') }}?v=20251110-nocache"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}?v=20251110-nocache"></script>
-    <!-- Handsontable JS -->
-    <script src="https://cdn.jsdelivr.net/npm/handsontable@14.0.0/dist/handsontable.full.min.js"></script>
+    <!-- Sistema de internacionalización -->
+    <script src="{{ url_for('static', filename='js/i18n.js') }}?v=20251202-lang-fix"></script>
+    <!-- Handsontable JS (offline) -->
+    <script src="{{ url_for('static', filename='libs/handsontable/handsontable.full.min.js') }}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
