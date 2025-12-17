@@ -1,14 +1,13 @@
 Set objShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-' Obtener directorio del script
+' Directorio base de la aplicación
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
-
-' Cambiar al directorio de la aplicación
 objShell.CurrentDirectory = scriptDir
 
-' Ejecutar npm start sin mostrar ventana (0 = oculto)
-objShell.Run "cmd /c npm start", 0, False
+' Ejecutar el launcher bat en modo oculto (usa Python/Electron portables)
+launcher = Chr(34) & scriptDir & "\launch.bat" & Chr(34)
+objShell.Run "cmd /c " & launcher, 0, False
 
 Set objShell = Nothing
 Set fso = Nothing
