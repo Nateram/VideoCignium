@@ -219,6 +219,35 @@ function startFlask() {
     devLog('📁 BASE_DIR:', BASE_DIR);
     devLog('📄 Python script:', PYTHON_SCRIPT);
 
+    // PRIMERO: Verificar si Flask ya está corriendo (iniciado por launch.bat)
+    const http = require('http');
+    const checkFlaskAlive = () => {
+      return new Promise((checkResolve) => {
+        const req = http.get(`http://localhost:${FLASK_PORT}`, { timeout: 2000 }, (res) => {
+          devLog('✅ Flask ya está corriendo en background');
+          checkResolve(true);
+        });
+        req.on('error', () => {
+          checkResolve(false);
+        });
+        req.on('timeout', () => {
+          req.destroy();
+          checkResolve(false);
+        });
+      });
+    };
+
+    // Verificar si Flask ya está vivo
+    checkFlaskAlive().then(isAlive => {
+      if (isAlive) {
+        devLog('✅ Flask detectado corriendo, usando proceso existente');
+        resolve(); // Flask ya está corriendo, no hacer nada
+        return;
+      }
+
+      // Si Flask NO está corriendo, iniciarlo
+      devLog('⏳ Flask no está corriendo, iniciando...');
+    
     // Buscar Python PORTABLE primero, luego Python del sistema
     const { spawnSync } = require('child_process');
     
@@ -390,6 +419,7 @@ function startFlask() {
         resolve(); // Continuar de todas formas
       }
     }, 15000);
+    }); // Cierre de checkFlaskAlive().then()
   });
 }
 

@@ -3,7 +3,66 @@ import random
 import easyocr
 from PIL import Image
 import logging
+import os
+from pathlib import Path
+
 logger = logging.getLogger("OCR")
+
+# Configurar EasyOCR para usar caché local (modo offline)
+CURRENT_DIR = Path(__file__).parent
+
+# Prioridad 1: carpeta portable incluida con la app
+CACHE_PORTABLE = CURRENT_DIR / "python-portable" / "easyocr-cache"
+# Prioridad 2: carpeta en la raíz del proyecto (por solicitud del usuario)
+CACHE_PROJECT = CURRENT_DIR / "easyocr-cache"
+
+# Establecer EASYOCR_HOME ANTES de cualquier operación
+EASYOCR_HOME = None
+if CACHE_PORTABLE.exists() and (CACHE_PORTABLE / "model").exists():
+    EASYOCR_HOME = str(CACHE_PORTABLE)
+    logger.info(f"✓ Usando caché EasyOCR (portable): {CACHE_PORTABLE}")
+elif CACHE_PROJECT.exists() and (CACHE_PROJECT / "model").exists():
+    EASYOCR_HOME = str(CACHE_PROJECT)
+    logger.info(f"✓ Usando caché EasyOCR (proyecto): {CACHE_PROJECT}")
+else:
+    logger.warning(f"⚠ No se encontró caché local de EasyOCR")
+
+# Configurar variables de entorno para modo OFFLINE
+if EASYOCR_HOME:
+    os.environ['EASYOCR_HOME'] = EASYOCR_HOME
+    
+os.environ['HF_HUB_OFFLINE'] = '1'  # Deshabilita Hugging Face Hub downloads
+
+# Inicializar Reader global (una sola vez para todo)
+EASYOCR_READER = None
+
+def get_ocr_reader():
+    """Obtiene o crea el lector de EasyOCR (singleton)."""
+    global EASYOCR_READER
+    if EASYOCR_READER is None:
+        try:
+            logger.info("Inicializando lector EasyOCR...")
+            # EasyOCR busca modelos en model_storage_directory/model/
+            # Así que le pasamos solo la raíz (easyocr-cache) no la carpeta model
+            if EASYOCR_HOME:
+                logger.info(f"Usando model_storage_directory: {EASYOCR_HOME}")
+                try:
+                    EASYOCR_READER = easyocr.Reader(['en'], gpu=False, model_storage_directory=EASYOCR_HOME, download_enabled=False)
+                except Exception as e1:
+                    logger.warning(f"Fallo con {EASYOCR_HOME}. Probando con subcarpeta 'model': {e1}")
+                    # Fallback: algunas versiones buscan directamente en la carpeta indicada sin 'model/'
+                    # Otras esperan que se les pase la raíz y ellas añaden 'model/'. Probamos ambos.
+                    alt_path = os.path.join(EASYOCR_HOME, 'model')
+                    logger.info(f"Intentando con model_storage_directory: {alt_path}")
+                    EASYOCR_READER = easyocr.Reader(['en'], gpu=False, model_storage_directory=alt_path, download_enabled=False)
+            else:
+                logger.warning("No se encontró caché local, intentando con valores por defecto")
+                EASYOCR_READER = easyocr.Reader(['en'], gpu=False)
+            logger.info("✓ Lector EasyOCR inicializado")
+        except Exception as e:
+            logger.error(f"✗ Error al inicializar EasyOCR: {e}")
+            raise
+    return EASYOCR_READER
 
 # Importaciones de tkinter solo cuando se ejecuta como aplicación independiente
 try:
@@ -43,10 +102,10 @@ if TKINTER_AVAILABLE:
             self.status_text = tk.StringVar(value="Cargando modelo OCR... Por favor, espera.")
             self.update() # Forzar actualización de la GUI para mostrar el mensaje
             try:
-                self.reader = easyocr.Reader(['en'], gpu=False)
+                self.reader = get_ocr_reader()
                 self.status_text.set("Modelo OCR cargado. Por favor, selecciona un video.")
             except Exception as e:
-                messagebox.showerror("Error de OCR", f"No se pudo cargar EasyOCR. Asegúrate de tener conexión a internet la primera vez.\nError: {e}")
+                messagebox.showerror("Error de OCR", f"No se pudo cargar EasyOCR.\n\nDetalles: {e}\n\nAsegúrate de que exista la carpeta: {EASYOCR_HOME}")
                 self.destroy()
                 return
 
@@ -202,20 +261,22 @@ else:
 
 def extract_timestamp_from_roi(frame, roi_coords):
     """
-    Recorta el ROI del frame y extrae el texto usando EasyOCR.
+    Recorta el ROI del frame y extrae el texto usando EasyOCR (offline).
+    Usa el Reader global para evitar descargas múltiples.
     """
     try:
-        reader = easyocr.Reader(['en'], gpu=False)
+        reader = get_ocr_reader()
         x, y, w, h = roi_coords
         roi = frame[y:y+h, x:x+w]
         resultado = reader.readtext(roi)
         if not resultado:
+            logger.warning("No se detectó texto en la ROI")
             return None
         texto_extraido = " ".join([res[1] for res in resultado])
-        logger.info(f"Texto extraído de ROI: {texto_extraido}")
+        logger.info(f"✓ Texto extraído de ROI: {texto_extraido}")
         return texto_extraido
     except Exception as e:
-        logger.error(f"Error en OCR: {e}")
+        logger.error(f"✗ Error en OCR: {e}")
         return None
 
 
