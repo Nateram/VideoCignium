@@ -27,7 +27,7 @@ def main():
 
         # Ejecutar en modo debug para desarrollo
         app.run(
-            host='0.0.0.0',
+            host='127.0.0.1',  # solo accesible desde este equipo
             port=5000,
             debug=True,
             use_reloader=False  # Deshabilitar reloader para evitar problemas con threads

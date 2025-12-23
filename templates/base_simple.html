@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
     <!-- Font Awesome para iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome.min.css') }}">
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -54,8 +54,7 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <!-- Config global (debe cargarse PRIMERO) -->
+        <!-- Config global (debe cargarse PRIMERO) -->
     <script src="{{ url_for('static', filename='js/config.js') }}?v=20251107-50mb"></script>
     <!-- Scripts de la aplicación -->
     <script src="{{ url_for('static', filename='js/main.js') }}?v=20251107-50mb"></script>
