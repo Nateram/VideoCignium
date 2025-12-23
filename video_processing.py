@@ -1,4 +1,8 @@
-# video_processing.py
+# 🔥 IMPORTAR PARCHE OFFLINE PRIMERO (antes de cualquier otra importación)
+try:
+    import offline_mode  # Deshabilita descargas de EasyOCR/HuggingFace
+except:
+    pass
 
 import cv2
 import numpy as np
@@ -8,6 +12,27 @@ import subprocess
 import ocr
 import sys
 import logging
+
+# ====================================================================
+# 🔥 FUNCIÓN AUXILIAR PARA OBTENER RUTA DE CONFIGURACIÓN ROI
+# ====================================================================
+def get_roi_config_path():
+    """Obtiene la ruta del archivo de configuración ROI desde AppData"""
+    try:
+        # Intentar obtener la ruta desde app (si se está ejecutando desde Flask)
+        from app import app
+        return app.config.get('ROI_CONFIG_PATH')
+    except:
+        pass
+    
+    # Fallback: construir la ruta manualmente (igual a como lo hace app.py)
+    if os.name == 'nt':  # Windows
+        user_data_dir = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'DetectorMovimiento')
+    else:  # Linux/Mac
+        user_data_dir = os.path.join(os.path.expanduser('~'), '.detector_movimiento')
+    
+    data_folder = os.path.join(user_data_dir, 'data_local')
+    return os.path.join(data_folder, 'timestamp_roi_config.json')
 
 # ====================================================================
 # 🔥 DEFINIR RUTA BASE DEL PROYECTO Y RUTA ABSOLUTA DE FFMPEG
@@ -28,6 +53,30 @@ try:
 except ImportError as e:
     logger.error(f"Error al importar YOLO: {e}")
     YOLO_AVAILABLE = False
+
+# ====================================================================
+# 🔥 CACHÉ GLOBAL DEL MODELO YOLO (se carga UNA sola vez por proceso)
+# Evita la recarga del modelo en cada clip, solucionando agotamiento de memoria
+# ====================================================================
+_yolo_model_cache = None
+
+def get_yolo_model():
+    """
+    Devuelve el modelo YOLO cargado, usando caché para evitar recargar en cada clip.
+    Solución al bug de 40 vídeos: el modelo se cargaba 390+ veces agotando la memoria.
+    """
+    global _yolo_model_cache
+    if _yolo_model_cache is None:
+        yolo_path = find_yolo_model()
+        if yolo_path is None:
+            return None
+        try:
+            _yolo_model_cache = YOLO(yolo_path)
+            logger.info(f"✅ Modelo YOLO cargado en caché: {yolo_path}")
+        except Exception as e:
+            logger.error(f"Error al cargar modelo YOLO en caché: {e}")
+            return None
+    return _yolo_model_cache
 
 def get_dominant_color(image):
     """
@@ -119,13 +168,13 @@ def process_video_for_motion(video_path, roi, threshold=None):
     # Calcular umbral adaptativo si no se proporciona
     if threshold is None:
         roi_size = (roi[2], roi[3])  # ancho, alto
-        threshold = calculate_adaptive_threshold(roi_size, threshold_percentage=1.0)
+        threshold = calculate_adaptive_threshold(roi_size, threshold_percentage=4.0)
         
     # Configurar BackgroundSubtractor con parámetros más estables
     fgbg = cv2.createBackgroundSubtractorMOG2(
-        varThreshold=16,        # Reducido para mayor estabilidad
+        varThreshold=30,        # Más alto para mayor estabilidad (menos falsos positivos)
         detectShadows=False,    # Desactivar sombras para mayor consistencia
-        history=200             # Mayor historia para modelo más estable
+        history=500             # Mayor historia para modelo más estable
     )
     
     # Variables de estado
@@ -133,7 +182,7 @@ def process_video_for_motion(video_path, roi, threshold=None):
     motion_start_time = 0
     last_motion_end_time = 0
     motion_events_ms = []
-    cooldown_after_motion_ms = 2000  # Aumentado para evitar clips repetidos (7 segundos)
+    cooldown_after_motion_ms = 15000  # 15 segundos entre eventos para evitar clips en ráfaga
     
     frame_count = 0
     
@@ -208,11 +257,11 @@ def get_motion_detection_config():
     """
     # Valores base por defecto
     default_config = {
-        'threshold_percentage': 1.0,         # Porcentaje del ROI (1% por defecto)
-        'var_threshold': 16,                 # Sensibilidad del background subtractor
-        'cooldown_ms': 2000,                # Tiempo mínimo entre detecciones (reducido)
+        'threshold_percentage': 4.0,         # Porcentaje del ROI (4% más estricto, menos clips)
+        'var_threshold': 30,                 # Sensibilidad del background subtractor (más alto = menos sensible)
+        'cooldown_ms': 15000,               # 15 segundos mínimo entre detecciones (evita clips en ráfaga)
         'gaussian_blur': (5, 5),            # Kernel de suavizado
-        'morph_kernel_size': (3, 3),        # Kernel para operaciones morfológicas
+        'morph_kernel_size': (5, 5),        # Kernel más grande para eliminar más ruido
         'binary_threshold': 127              # Threshold para binarización
     }
     
@@ -248,8 +297,8 @@ def calculate_adaptive_threshold(roi_size, threshold_percentage=1.0):
     adaptive_threshold = int(roi_area * (threshold_percentage / 100))
     
     # Establecer límites mínimo y máximo razonables
-    min_threshold = 50   # Mínimo para evitar ruido
-    max_threshold = 5000 # Máximo para ROIs muy grandes
+    min_threshold = 300   # Mínimo elevado para ignorar movimientos pequeños (hojas, sombras, etc.)
+    max_threshold = 8000  # Máximo para ROIs muy grandes
     
     adaptive_threshold = max(min_threshold, min(adaptive_threshold, max_threshold))
     
@@ -277,7 +326,7 @@ def process_video_for_motion_advanced(video_path, roi, config=None):
     fgbg = cv2.createBackgroundSubtractorMOG2(
         varThreshold=config['var_threshold'],
         detectShadows=False,
-        history=200
+        history=500
     )
     
     # Variables de estado
@@ -425,16 +474,10 @@ def analyze_motion_event(video_path, event_ms, roi_coords):
     Devuelve una lista de tuplas (objeto, color dominante).
     Incluye detección mejorada de: coches, furgonetas, camiones, motos, personas.
     """
-    try:
-        yolo_path = find_yolo_model()
-        if yolo_path is None:
-            logger.warning("Modelo YOLO no encontrado, utilizando valores predeterminados")
-            return [("otro", "desconocido")]
-            
-        model = YOLO(yolo_path)  # Cargar el modelo YOLO con la ruta encontrada
-    except Exception as e:
-        logger.error(f"Error al cargar modelo YOLO: {e}")
-        return [("otro", "desconocido")]  # Valor fallback si falla la carga del modelo
+    model = get_yolo_model()
+    if model is None:
+        logger.warning("Modelo YOLO no disponible")
+        return [("otro", "desconocido")]
         
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -525,10 +568,17 @@ def get_ffmpeg_path():
         logger.warning("  Intentando usar ffmpeg del PATH del sistema...")
         return 'ffmpeg'
 
-def create_clip_from_event(video_path, event_ms, clip_duration_ms=16000, roi_coords=None):
+def create_clip_from_event(video_path, event_ms, clip_duration_ms=16000, roi_coords=None, output_folder=None):
     """
     Crea un clip de video de una duración específica alrededor de un evento.
     El parámetro roi_coords se acepta para compatibilidad pero no se usa.
+    
+    Args:
+        video_path: Ruta del video fuente
+        event_ms: Tiempo del evento en milisegundos
+        clip_duration_ms: Duración del clip en ms
+        roi_coords: Coordenadas ROI (no usado, para compatibilidad)
+        output_folder: Carpeta donde guardar el clip. Si es None, usa carpeta del video.
     """
     logger.info(f"Creando clip para evento en tiempo {event_ms}ms del video: {video_path}")
     
@@ -585,10 +635,17 @@ def create_clip_from_event(video_path, event_ms, clip_duration_ms=16000, roi_coo
     video_name_part = ''.join(e for e in video_name_part if e.isalnum() or e in '._- ')[:20]
     
     clip_filename = f"{event_time.strftime('%H-%M-%S_%d-%m-%Y')}_{video_name_part}_clip.mp4"
-    clip_path = os.path.join(os.path.dirname(video_path), "clips_analisis", clip_filename)
     
-    if not os.path.exists(os.path.dirname(clip_path)):
-        os.makedirs(os.path.dirname(clip_path))
+    # Usar carpeta de salida especificada o carpeta junto al video
+    if output_folder:
+        clips_dir = output_folder
+    else:
+        clips_dir = os.path.join(os.path.dirname(video_path), "clips_analisis")
+    
+    clip_path = os.path.join(clips_dir, clip_filename)
+    
+    if not os.path.exists(clips_dir):
+        os.makedirs(clips_dir)
         
     out = cv2.VideoWriter(clip_path, fourcc, fps, (frame_width, frame_height))
     
@@ -678,9 +735,9 @@ def extract_timestamp_from_frame(frame, roi_coords=None, roi_override=None):
     if roi_override:
         roi_coords = roi_override
     elif roi_coords is None:
-        # 🔥 USAR RUTA ABSOLUTA PARA ARCHIVO DE CONFIGURACIÓN
-        config_path = os.path.join(BASE_DIR, "timestamp_roi_config.json")
-        if os.path.exists(config_path):
+        # Obtener ruta desde AppData
+        config_path = get_roi_config_path()
+        if config_path and os.path.exists(config_path):
             import json
             with open(config_path, 'r') as f:
                 config = json.load(f)
@@ -760,10 +817,9 @@ def extract_timestamp_from_video_at_ms(video_path, event_ms, roi_override=None):
     if roi_override:
         logger.info(f"📍 ROI override especificado: x={roi_override[0]}, y={roi_override[1]}, w={roi_override[2]}, h={roi_override[3]}")
     else:
-        # Verificar si existe configuración guardada
-        # 🔥 USAR RUTA ABSOLUTA PARA ARCHIVO DE CONFIGURACIÓN
-        config_path = os.path.join(BASE_DIR, "timestamp_roi_config.json")
-        if os.path.exists(config_path):
+        # Verificar si existe configuración guardada en AppData
+        config_path = get_roi_config_path()
+        if config_path and os.path.exists(config_path):
             try:
                 import json
                 with open(config_path, 'r') as f:
@@ -848,11 +904,10 @@ def extract_timestamp_from_video_at_ms(video_path, event_ms, roi_override=None):
 
 def get_timestamp_roi():
     """
-    Devuelve la zona de timestamp guardada en el archivo de configuración.
+    Devuelve la zona de timestamp guardada en el archivo de configuración desde AppData.
     """
-    # 🔥 USAR RUTA ABSOLUTA PARA ARCHIVO DE CONFIGURACIÓN
-    config_path = os.path.join(BASE_DIR, "timestamp_roi_config.json")
-    if os.path.exists(config_path):
+    config_path = get_roi_config_path()
+    if config_path and os.path.exists(config_path):
         import json
         with open(config_path, 'r') as f:
             config = json.load(f)
@@ -866,15 +921,9 @@ def analyze_clip_object(clip_path, roi_coords):
     Devuelve el objeto y color más frecuente detectado en la ROI.
     """
     from collections import Counter
-    try:
-        yolo_path = find_yolo_model()
-        if yolo_path is None:
-            logger.warning("Modelo YOLO no encontrado, utilizando valores predeterminados")
-            return "Otro", "Desconocido"
-            
-        model = YOLO(yolo_path)  # Cargar el modelo YOLO con la ruta encontrada
-    except Exception as e:
-        logger.error(f"Error al cargar modelo YOLO: {e}")
+    model = get_yolo_model()
+    if model is None:
+        logger.warning("Modelo YOLO no disponible")
         return "Otro", "Desconocido"
         
     cap = cv2.VideoCapture(clip_path)
@@ -915,15 +964,9 @@ def debug_analyze_clip_objects(clip_path, roi_coords):
     Analiza todos los objetos detectados en la ROI del clip y muestra el conteo por tipo en consola (debug).
     """
     from collections import Counter
-    try:
-        yolo_path = find_yolo_model()
-        if yolo_path is None:
-            logger.warning("Modelo YOLO no encontrado, saltando análisis de objetos")
-            return
-            
-        model = YOLO(yolo_path)  # Cargar el modelo YOLO con la ruta encontrada
-    except Exception as e:
-        logger.error(f"Error al cargar modelo YOLO: {e}")
+    model = get_yolo_model()
+    if model is None:
+        logger.warning("Modelo YOLO no disponible, saltando análisis de objetos")
         return
     
     cap = cv2.VideoCapture(clip_path)
@@ -975,15 +1018,9 @@ def analyze_frame_at_timestamp(video_path, event_ms, roi_coords):
     Útil para modo 'sin clips' donde solo se registran eventos.
     """
     from collections import Counter
-    try:
-        yolo_path = find_yolo_model()
-        if yolo_path is None:
-            logger.warning("Modelo YOLO no encontrado, utilizando valores predeterminados")
-            return "Otro", "Desconocido"
-            
-        model = YOLO(yolo_path)
-    except Exception as e:
-        logger.error(f"Error al cargar modelo YOLO: {e}")
+    model = get_yolo_model()
+    if model is None:
+        logger.warning("Modelo YOLO no disponible")
         return "Otro", "Desconocido"
     
     # Abrir video y posicionar en el timestamp del evento
@@ -1049,15 +1086,9 @@ def analyze_frame_at_timestamp(video_path, event_ms, roi_coords):
     Útil para modo 'sin clips' donde solo se registran eventos.
     """
     from collections import Counter
-    try:
-        yolo_path = find_yolo_model()
-        if yolo_path is None:
-            logger.warning("Modelo YOLO no encontrado, utilizando valores predeterminados")
-            return "Otro", "Desconocido"
-            
-        model = YOLO(yolo_path)
-    except Exception as e:
-        logger.error(f"Error al cargar modelo YOLO: {e}")
+    model = get_yolo_model()
+    if model is None:
+        logger.warning("Modelo YOLO no disponible")
         return "Otro", "Desconocido"
     
     # Abrir video y posicionar en el timestamp del evento

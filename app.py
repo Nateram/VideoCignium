@@ -1,10 +1,18 @@
 
 # app.py - Aplicación Flask para Detector de Movimiento
 # VERSIÓN: 20251107-chunks-20MB-fix-spaces
+
+# 🔥 IMPORTAR PARCHE OFFLINE PRIMERO (antes de cualquier otra importación)
+try:
+    import offline_mode  # Deshabilita descargas de EasyOCR/HuggingFace
+except:
+    pass
+
 import os
 import sys
 import json
 import subprocess
+import gc
 from flask import Flask, render_template, request, jsonify, send_from_directory, url_for, Response, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -24,9 +32,6 @@ from collections import deque
 # 🔥 DEFINIR RUTA BASE DEL PROYECTO (INDEPENDIENTE DEL DIRECTORIO DE TRABAJO)
 # ====================================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Buffer para logs de eventos en directo
-live_event_logs = deque(maxlen=100)
 
 # Agregar el directorio actual al path para importar módulos
 sys.path.insert(0, BASE_DIR)
@@ -101,6 +106,7 @@ app.config['ALLOWED_EXTENSIONS'] = {'mp4', 'avi', 'mov', 'dav', 'mkv'}
 # ====================================================================
 app.config['DATA_FOLDER'] = os.path.join(USER_DATA_DIR, 'data_local')
 app.config['DB_PATH'] = os.path.join(app.config['DATA_FOLDER'], 'detector_movimiento.db')
+app.config['ROI_CONFIG_PATH'] = os.path.join(app.config['DATA_FOLDER'], 'timestamp_roi_config.json')
 app.config['CLIPS_FOLDER'] = os.path.join(app.config['DATA_FOLDER'], 'clips_analisis')
 
 # Crear carpetas
@@ -294,7 +300,7 @@ def check_roi_configuration():
     logger.info("="*80)
     logger.info("🔍 Verificando configuración de ROI de timestamp...")
     
-    config_file = os.path.join(BASE_DIR, 'timestamp_roi_config.json')
+    config_file = app.config['ROI_CONFIG_PATH']
     
     if os.path.exists(config_file):
         try:
@@ -662,21 +668,21 @@ def get_video_clips(video_id):
 
 @app.route('/clips/<path:filename>')
 def serve_clip(filename):
-    """Sirve archivos de clip de video de la sesión actual con soporte para streaming"""
+    """Sirve archivos de clip de video con soporte para streaming"""
     # Decodificar el nombre del archivo (espacios y caracteres especiales)
     filename = unquote(filename)
     
     logger.info(f"🎬 Intentando servir clip: {filename}")
     
-    # Usar BD de sesión
-    session_db_path = processing_status.get('session_db_path')
+    # ✅ USAR BD PERMANENTE para buscar clips (los datos persisten entre sesiones)
+    db_path = app.config['DB_PATH']
     
-    if not session_db_path or not os.path.exists(session_db_path):
-        logger.error("❌ No hay sesión activa")
-        return jsonify({'error': 'No hay sesión activa'}), 404
+    if not db_path or not os.path.exists(db_path):
+        logger.error("❌ No se encontró la base de datos")
+        return jsonify({'error': 'Base de datos no disponible'}), 404
     
-    # Buscar el clip en la base de datos
-    conn = db.create_db_connection(session_db_path)
+    # Buscar el clip en la base de datos permanente
+    conn = db.create_db_connection(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT ruta_absoluta FROM clips WHERE nombre_archivo = ?", (filename,))
     result = cursor.fetchone()
@@ -1977,184 +1983,6 @@ def calculate_event_datetime(base_timestamp_str, event_ms):
         # Fallback: usar fecha del sistema
         return datetime.now().strftime('%d-%m-%Y %H:%M:%S')
 
-def detect_motion_in_frame(prev_frame, curr_frame, roi):
-    # ROI: [x, y, w, h]
-    x, y, w, h = roi
-    prev_roi = prev_frame[y:y+h, x:x+w]
-    curr_roi = curr_frame[y:y+h, x:x+w]
-    diff = cv2.absdiff(prev_roi, curr_roi)
-    gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-    thresh = cv2.threshold(gray, 25, 255, cv2.THRESH_BINARY)[1]
-    motion_score = np.sum(thresh) / 255
-    return motion_score > 500  # Umbral simple, ajustable
-
-@app.route('/api/live/start', methods=['POST'])
-def start_live_analysis():
-    """
-    Inicia el análisis en tiempo real del stream MJPEG.
-    Espera JSON: { "stream_url": "...", "roi": [x, y, w, h] }
-    """
-    data = request.get_json()
-    stream_url = data.get('stream_url')
-    roi = data.get('roi', [0, 0, 640, 480])
-
-    if not stream_url:
-        return jsonify({'success': False, 'error': 'stream_url requerido'}), 400
-
-    # Log: inicio de análisis en directo y ROI recibido (en buffer y archivo físico)
-    log_msg = f'🔴 [LIVE] Iniciando análisis en directo. URL: {stream_url}, ROI: {roi}'
-    live_event_logs.append({
-        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'message': log_msg
-    })
-    logger.info(log_msg)
-
-    # Log físico detallado del ROI recibido
-    logger.info(f"[LIVE] ROI recibido: x={roi[0]}, y={roi[1]}, w={roi[2]}, h={roi[3]}")
-
-    # Log de parámetros de análisis en directo
-    logger.info(f"[LIVE] Parámetros de análisis: stream_url={stream_url}, ROI={roi}")
-
-    # Procesar el stream MJPEG en un thread
-    def live_analysis_worker(stream_url, roi):
-        logger.info(f"[LIVE] Thread de análisis en directo iniciado para stream: {stream_url}")
-        try:
-            import requests
-            import cv2
-            import numpy as np
-            from datetime import datetime
-
-            # Conectar al stream MJPEG
-            cap = cv2.VideoCapture(stream_url)
-            if not cap.isOpened():
-                logger.error(f"[LIVE] No se pudo abrir el stream: {stream_url}")
-                return
-
-            logger.info(f"[LIVE] Stream abierto correctamente. Procesando frames...")
-            prev_frame = None
-            frame_count = 0
-            motion_events = 0
-            last_motion_frame = -1000  # Para controlar el umbral de frames entre eventos
-            MOTION_FRAME_GAP =200      # Mínimo de frames entre logs de movimiento
-            while True:
-                ret, frame = cap.read()
-                if not ret or frame is None:
-                    logger.warning(f"[LIVE] No se pudo leer frame {frame_count} del stream.")
-                    break
-                frame_count += 1
-                # Validar dimensiones del frame y ROI
-                x, y, w, h = roi
-                frame_h, frame_w = frame.shape[:2]
-                if (x < 0 or y < 0 or w <= 0 or h <= 0 or x+w > frame_w or y+h > frame_h):
-                    if frame_count == 1:
-                        logger.warning(f"[LIVE] ROI fuera de límites del frame. Frame: {frame_w}x{frame_h}, ROI: {roi}")
-                    continue
-                roi_frame = frame[y:y+h, x:x+w]
-                if roi_frame is None or roi_frame.size == 0:
-                    if frame_count == 1:
-                        logger.warning(f"[LIVE] ROI vacío en frame {frame_count}. ROI: {roi}")
-                    continue
-                if prev_frame is not None:
-                    prev_roi = prev_frame[y:y+h, x:x+w]
-                    if prev_roi is None or prev_roi.size == 0:
-                        continue
-                    try:
-                        diff = cv2.absdiff(prev_roi, roi_frame)
-                        gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-                        thresh = cv2.threshold(gray, 25, 255, cv2.THRESH_BINARY)[1]
-                        motion_score = np.sum(thresh) / 255
-                        if motion_score > 500:
-                            # Solo loguear si han pasado MOTION_FRAME_GAP frames desde el último evento Y si hay al menos MOTION_FRAME_GAP frames procesados
-                            if frame_count >= MOTION_FRAME_GAP and frame_count - last_motion_frame >= MOTION_FRAME_GAP:
-                                motion_events += 1
-                                last_motion_frame = frame_count
-                                event_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                logger.info(f"[LIVE] 🚨 Movimiento detectado en frame {frame_count} (score={motion_score}) | ROI={roi} | {event_time}")
-                                live_event_logs.append({
-                                    'timestamp': event_time,
-                                    'message': f'🚨 Movimiento detectado en frame {frame_count} (score={motion_score})'
-                                })
-                    except Exception as e:
-                        logger.error(f"[LIVE] Error procesando frame {frame_count}: {e}")
-                prev_frame = frame.copy()
-                # Eliminar límite de frames: el análisis nunca termina automáticamente
-            cap.release()
-            logger.info(f"[LIVE] Análisis en directo finalizado. Frames procesados: {frame_count}, eventos de movimiento: {motion_events}")
-        except Exception as e:
-            logger.error(f"[LIVE] Error en análisis en directo: {type(e).__name__}: {e}")
-
-    import threading
-    thread = threading.Thread(target=live_analysis_worker, args=(stream_url, roi))
-    thread.daemon = True
-    thread.start()
-    def process_stream():
-        try:
-                resp = requests.get(stream_url, stream=True, timeout=5)
-                bytes_data = b''
-                prev_frame = None
-                frame_count = 0
-                logger.info(f"live_analysis | 🔴 Iniciando análisis en directo. URL: {stream_url}, ROI: {roi}")
-                for chunk in resp.iter_content(chunk_size=1024):
-                    bytes_data += chunk
-                    a = bytes_data.find(b'\xff\xd8')
-                    b = bytes_data.find(b'\xff\xd9')
-                    if a != -1 and b != -1:
-                        jpg = bytes_data[a:b+2]
-                        bytes_data = bytes_data[b+2:]
-                        frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
-                        frame_count += 1
-                        if frame is not None:
-                            if prev_frame is not None:
-                                try:
-                                    motion = detect_motion_in_frame(prev_frame, frame, roi)
-                                    if motion:
-                                        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                        msg = f"Movimiento detectado en frame {frame_count} (ROI: {roi})"
-                                        live_event_logs.append({
-                                            'timestamp': timestamp,
-                                            'message': msg,
-                                        })
-                                        logger.info(f"live_analysis | {msg}")
-                                    else:
-                                        live_event_logs.append({
-                                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                            'message': msg
-                                        })
-                                        logger.info(f"live_analysis | {msg}")
-                                except Exception as err:
-                                    msg = f"Error procesando frame {frame_count}: {err}"
-                                    live_event_logs.append({
-                                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                        'message': msg
-                                    })
-                                    logger.error(f"live_analysis | {msg}")
-                            else:
-                                live_event_logs.append({
-                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                    'message': msg
-                                })
-                                logger.info(f"live_analysis | {msg}")
-                            prev_frame = frame
-                        else:
-                            msg = f"Frame {frame_count}: Frame inválido (None)"
-                            live_event_logs.append({
-                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                'message': msg
-                            })
-                            logger.warning(f"live_analysis | {msg}")
-        except Exception as e:
-            msg = f"Error en stream: {e}"
-            # No agregar el error al buffer de eventos para frontend
-            logger.error(f"live_analysis | {msg}")
-
-    threading.Thread(target=process_stream, daemon=True).start()
-    return jsonify({'success': True, 'message': 'Análisis en directo iniciado'})
-
-@app.route('/api/live/logs', methods=['GET'])
-def get_live_logs():
-    # Devuelve los logs de eventos en directo
-    return jsonify({'success': True, 'logs': list(live_event_logs)})
-
 def process_single_job(job):
     """
     🔥 ARQUITECTURA CORREGIDA: Procesa UNA tarea completa de forma SECUENCIAL
@@ -2255,20 +2083,21 @@ def process_single_job(job):
             
             # FASE 2: Generar clips si está activado
             if generate_clips and motion_events:
-                clips_dir = os.path.join(folder_path, 'clips_analisis')
+                # ✅ USAR CARPETA PERMANENTE DE CLIPS (no depende de la sesión)
+                clips_dir = app.config['CLIPS_FOLDER']
                 os.makedirs(clips_dir, exist_ok=True)
-                logger.info(f"🎞️ Generando {len(motion_events)} clips para {video_file}...")
+                logger.info(f"🎞️ Generando {len(motion_events)} clips para {video_file} en {clips_dir}...")
                 for clip_idx, event_ms in enumerate(motion_events):
                     try:
+                        # Pasar carpeta de clips permanente
                         clip_path = video_processing.create_clip_from_event(
-                            video_path, event_ms, roi_coords=tuple(roi) if roi else None
+                            video_path, event_ms, 
+                            roi_coords=tuple(roi) if roi else None,
+                            output_folder=clips_dir
                         )
                         if clip_path and os.path.exists(clip_path):
                             clip_filename = os.path.basename(clip_path)
-                            final_clip_path = os.path.join(clips_dir, clip_filename)
-                            if clip_path != final_clip_path:
-                                import shutil
-                                shutil.move(clip_path, final_clip_path)
+                            final_clip_path = clip_path  # Ya está en la carpeta correcta
                             total_clips_created += 1
                             processing_status['clips_generated'] = total_clips_created
                             object_type = None
@@ -2316,8 +2145,14 @@ def process_single_job(job):
                                  event_ms, event_datetime, object_type, object_color)
             
             logger.info(f"✅ Video completado: {video_file} - Eventos: {len(motion_events)}")
+            # Guardar progreso en BD después de cada video
+            main_conn.commit()
+            # Liberar memoria acumulada entre videos
+            gc.collect()
         except Exception as e:
             logger.error(f"❌ Error al procesar video {video_file}: {e}")
+            main_conn.commit()  # Commit incluso en error para salvaguardar el progreso anterior
+            gc.collect()
     
     # Cerrar conexión de BD
     main_conn.close()
@@ -2448,11 +2283,10 @@ def get_processing_status():
 def get_clip_details(clip_id):
     """Obtiene detalles de un clip específico (o evento sin clip)"""
     try:
-        session_db_path = get_session_db()
-        if not session_db_path:
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
+        # ✅ USAR BD PERMANENTE para obtener detalles del clip
+        db_path = app.config['DB_PATH']
         
-        conn = db.create_db_connection(session_db_path)
+        conn = db.create_db_connection(db_path)
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -2508,11 +2342,10 @@ def update_clip(clip_id):
         if not data:
             return jsonify({'success': False, 'error': 'No se enviaron datos'}), 400
         
-        session_db_path = get_session_db()
-        if not session_db_path:
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
+        # ✅ USAR BD PERMANENTE para actualizar clip
+        db_path = app.config['DB_PATH']
         
-        conn = db.create_db_connection(session_db_path)
+        conn = db.create_db_connection(db_path)
         cursor = conn.cursor()
         
         # Verificar que el clip existe
@@ -2566,11 +2399,10 @@ def delete_clip(clip_id):
         data = request.json or {}
         delete_from_disk = data.get('delete_from_disk', False)
         
-        session_db_path = get_session_db()
-        if not session_db_path:
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
+        # ✅ USAR BD PERMANENTE para eliminar clip
+        db_path = app.config['DB_PATH']
         
-        conn = db.create_db_connection(session_db_path)
+        conn = db.create_db_connection(db_path)
         cursor = conn.cursor()
         
         # Obtener ruta del clip
@@ -2604,7 +2436,7 @@ def delete_clip(clip_id):
         session_id = processing_status.get('session_id')
         if session_id:
             session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
-            create_or_update_session_excel(session_db_path, session_folder)
+            create_or_update_session_excel(db_path, session_folder)
         
         return jsonify({
             'success': True,
@@ -2619,13 +2451,12 @@ def delete_clip(clip_id):
 
 @app.route('/api/video/<int:video_id>', methods=['DELETE'])
 def delete_video(video_id):
-    """Elimina un video y todos sus clips de la sesión actual"""
+    """Elimina un video y todos sus clips"""
     try:
-        session_db_path = get_session_db()
-        if not session_db_path:
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
+        # ✅ USAR BD PERMANENTE
+        db_path = app.config['DB_PATH']
         
-        conn = db.create_db_connection(session_db_path)
+        conn = db.create_db_connection(db_path)
         cursor = conn.cursor()
         
         # Obtener ruta del video original
@@ -2685,7 +2516,7 @@ def delete_video(video_id):
         session_id = processing_status.get('session_id')
         if session_id:
             session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
-            create_or_update_session_excel(session_db_path, session_folder)
+            create_or_update_session_excel(db_path, session_folder)
         
         return jsonify({
             'success': True,
@@ -2699,13 +2530,12 @@ def delete_video(video_id):
 
 @app.route('/api/folder/<int:folder_id>', methods=['DELETE'])
 def delete_folder(folder_id):
-    """Elimina una carpeta y todos sus videos y clips de la sesión actual"""
+    """Elimina una carpeta y todos sus videos y clips"""
     try:
-        session_db_path = get_session_db()
-        if not session_db_path:
-            return jsonify({'success': False, 'error': 'No hay sesión activa'}), 404
+        # ✅ USAR BD PERMANENTE
+        db_path = app.config['DB_PATH']
         
-        conn = db.create_db_connection(session_db_path)
+        conn = db.create_db_connection(db_path)
         cursor = conn.cursor()
         
         # Obtener ruta de la carpeta y todos los videos
@@ -2807,7 +2637,7 @@ def delete_folder(folder_id):
         session_id = processing_status.get('session_id')
         if session_id:
             session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
-            create_or_update_session_excel(session_db_path, session_folder)
+            create_or_update_session_excel(db_path, session_folder)
         
         return jsonify({
             'success': True,
@@ -2839,13 +2669,12 @@ def save_roi_config():
             'h': data.get('h', 80)
         }
         
-        # Guardar en un archivo de configuración
-        # 🔥 USAR RUTA ABSOLUTA
-        config_file = os.path.join(BASE_DIR, 'timestamp_roi_config.json')
+        # Guardar en AppData del usuario
+        config_file = app.config['ROI_CONFIG_PATH']
+        os.makedirs(os.path.dirname(config_file), exist_ok=True)
         with open(config_file, 'w') as f:
             json.dump(roi_config, f)
-        # Log físico del guardado de ROI
-        logger.info(f"live_analysis | ROI guardado: {roi_config}")
+        logger.info(f"ROI guardado: {roi_config}")
         
         return jsonify({
             'success': True,
@@ -2861,8 +2690,8 @@ def save_roi_config():
 def get_roi_config():
     """Obtiene la configuración del ROI guardada"""
     try:
-        # 🔥 USAR RUTA ABSOLUTA
-        config_file = os.path.join(BASE_DIR, 'timestamp_roi_config.json')
+        # Obtener ruta de AppData
+        config_file = app.config['ROI_CONFIG_PATH']
         
         if os.path.exists(config_file):
             with open(config_file, 'r') as f:
@@ -2900,9 +2729,8 @@ def test_roi_config():
         if roi_data:
             roi_config = json.loads(roi_data)
         else:
-            # Usar configuración guardada
-            # 🔥 USAR RUTA ABSOLUTA
-            config_file = os.path.join(BASE_DIR, 'timestamp_roi_config.json')
+            # Usar configuración guardada desde AppData
+            config_file = app.config['ROI_CONFIG_PATH']
             if not os.path.exists(config_file):
                 return jsonify({
                     'success': False, 
@@ -3316,18 +3144,18 @@ def get_excel_data():
     try:
         session_db_path = get_session_db()
         if not session_db_path:
-            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
+            return jsonify({'success': False, 'error': 'no_hay_datos_procesados'}), 404
 
         # Obtener información de la sesión
         session_id = processing_status.get('session_id')
         if not session_id:
-            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
+            return jsonify({'success': False, 'error': 'no_hay_datos_procesados'}), 404
 
         session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
         excel_file = os.path.join(session_folder, 'session_data.xlsx')
 
         if not excel_file or not os.path.exists(excel_file):
-            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
+            return jsonify({'success': False, 'error': 'no_hay_datos_procesados'}), 404
 
         # Leer el Excel y convertir a formato JSON
         excel_data = {}
@@ -3375,52 +3203,24 @@ def download_excel_file():
     try:
         session_db_path = get_session_db()
         if not session_db_path:
-            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
+            return jsonify({'success': False, 'error': 'no_hay_datos_procesados'}), 404
 
         # Obtener información de la sesión
         session_id = processing_status.get('session_id')
         if not session_id:
-            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
+            return jsonify({'success': False, 'error': 'no_hay_datos_procesados'}), 404
 
         session_folder = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
         excel_file = os.path.join(session_folder, 'session_data.xlsx')
 
         if not excel_file or not os.path.exists(excel_file):
-            return jsonify({'success': False, 'error': 'No hay datos procesados. Analiza videos primero.'}), 404
+            return jsonify({'success': False, 'error': 'no_hay_datos_procesados'}), 404
 
         # Enviar el archivo
         return send_file(excel_file, as_attachment=True, download_name='session_data.xlsx')
 
     except Exception as e:
         logger.error(f"Error al descargar Excel de sesión: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# Nuevo endpoint para guardar el ROI de análisis en directo
-@app.route('/api/config/roi/live', methods=['POST'])
-def save_live_roi_config():
-    """Guarda la configuración del ROI para análisis en directo"""
-    try:
-        data = request.json
-        roi_config = {
-            'x': data.get('x', 0),
-            'y': data.get('y', 0),
-            'w': data.get('w', 200),
-            'h': data.get('h', 80)
-        }
-        # Guardar en archivo específico para directo
-        config_file = os.path.join(os.path.dirname(__file__), '..', 'live_roi_config.json')
-        with open(config_file, 'w') as f:
-            json.dump(roi_config, f)
-        # Log físico del guardado de ROI directo
-        logger.info(f"live_analysis | ROI DIRECTO guardado: {roi_config}")
-        return jsonify({
-            'success': True,
-            'message': 'Configuración ROI de directo guardada',
-            'roi': roi_config
-        })
-    except Exception as e:
-        logger.error(f"Error al guardar configuración ROI directo: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
