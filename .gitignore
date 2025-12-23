@@ -190,3 +190,9 @@ data_local/
 *.xlsx
 .env
 .env.prod
+easyocr-cache/
+pip-cache/
+torch-cache/
+logs/
+vc_redist.x64.exe
+*.jar

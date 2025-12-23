@@ -71,7 +71,7 @@ pip install -r requirements.txt
 npm install
 ```
 
-> **Nota:** `node_modules/`, `python-portable/` y la carpeta de FFmpeg no se incluyen en el repositorio. Se generan con `npm install`, el script de preparación de Python portable y descargando FFmpeg (https://www.gyan.dev/ffmpeg/builds/) en la raíz del proyecto.
+> **Nota:** la aplicación funciona 100 % en local, sin internet. Lo que no está en el repositorio se prepara una sola vez antes de compilar: `npm install` (Electron), `prepare-portable-python.bat` (Python portable con las dependencias), `download-easyocr-models.bat` (modelos de OCR en `easyocr-cache/`), FFmpeg (https://www.gyan.dev/ffmpeg/builds/) en la raíz y `vc_redist.x64.exe` de Microsoft.
 
 
 ### 4. Ejecutar la Aplicación
@@ -443,7 +443,7 @@ pip install -r requirements.txt
 npm install
 ```
 
-> **Note:** `node_modules/`, `python-portable/` and the FFmpeg folder are not included in the repository. Create them with `npm install`, the portable Python setup script, and by downloading FFmpeg (https://www.gyan.dev/ffmpeg/builds/) into the project root.
+> **Note:** the app runs 100% locally, without internet. What is not in the repository is prepared once before building: `npm install` (Electron), `prepare-portable-python.bat` (portable Python with dependencies), `download-easyocr-models.bat` (OCR models in `easyocr-cache/`), FFmpeg (https://www.gyan.dev/ffmpeg/builds/) in the project root and Microsoft's `vc_redist.x64.exe`.
 
 
 ### 4. Run the Application
