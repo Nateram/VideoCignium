@@ -24,7 +24,6 @@ import cv2
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
 import pandas as pd
-import requests
 import numpy as np
 from collections import deque
 
@@ -84,7 +83,8 @@ if PREFIX:
     app.wsgi_app = PrefixMiddleware(app.wsgi_app, PREFIX)
     # Log se agregará después cuando logger esté configurado
 
-CORS(app)
+# Solo la propia aplicación (Electron en 127.0.0.1) puede llamar a la API
+CORS(app, origins=["http://127.0.0.1:5000", "http://localhost:5000"])
 
 # ====================================================================
 # 📂 CONFIGURACIÓN DE CARPETA DE DATOS DE USUARIO
@@ -96,7 +96,7 @@ else:  # Linux/Mac
     USER_DATA_DIR = os.path.join(os.path.expanduser('~'), '.detector_movimiento')
 
 # Configuración
-app.config['SECRET_KEY'] = 'detector-movimiento-secret-key-2025'
+app.config['SECRET_KEY'] = os.urandom(32)  # clave aleatoria en cada arranque: la app es local, no hay nada que configurar
 app.config['MAX_CONTENT_LENGTH'] = 2000 * 1024 * 1024  # 2GB máximo (para videos grandes)
 app.config['UPLOAD_FOLDER'] = os.path.join(USER_DATA_DIR, 'uploads')
 app.config['ALLOWED_EXTENSIONS'] = {'mp4', 'avi', 'mov', 'dav', 'mkv'}
@@ -277,7 +277,7 @@ def check_system_dependencies():
     # 6. Verificar espacio en disco
     try:
         import shutil
-        total, used, free = shutil.disk_usage(os.path.dirname(__file__))
+        total, used, free = shutil.disk_usage(os.path.dirname(os.path.abspath(__file__)))
         free_gb = free // (2**30)
         logger.info(f"   ✓ Espacio libre en disco: {free_gb} GB")
         dependencies_status['disk_space'] = {'available': True, 'free_gb': free_gb}
@@ -3322,7 +3322,7 @@ if __name__ == '__main__':
     try:
         # Siempre modo producción sin debug ni reloader (evita logs duplicados)
         # use_reloader=False es CRÍTICO para evitar que Flask inicie 2 procesos
-        app.run(debug=False, host='0.0.0.0', port=5000, threaded=True, use_reloader=False)
+        app.run(debug=False, host='127.0.0.1', port=5000, threaded=True, use_reloader=False)  # solo accesible desde este equipo
     except KeyboardInterrupt:
         print("\n🛑 Servidor detenido por el usuario")
     finally:

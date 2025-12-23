@@ -14,8 +14,6 @@ easyocr>=1.7.0
 # Procesamiento de datos
 pandas>=2.0.0
 
-# HTTP requests
-requests>=2.31.0
 
 # PyTorch (requerido por ultralytics y easyocr) - versión estable compatible con Python 3.11
 torch>=2.1.0
