@@ -57,7 +57,7 @@ def get_ocr_reader():
                     EASYOCR_READER = easyocr.Reader(['en'], gpu=False, model_storage_directory=alt_path, download_enabled=False)
             else:
                 logger.warning("No se encontró caché local, intentando con valores por defecto")
-                EASYOCR_READER = easyocr.Reader(['en'], gpu=False)
+                EASYOCR_READER = easyocr.Reader(['en'], gpu=False, download_enabled=False)
             logger.info("✓ Lector EasyOCR inicializado")
         except Exception as e:
             logger.error(f"✗ Error al inicializar EasyOCR: {e}")

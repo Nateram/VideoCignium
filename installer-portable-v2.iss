@@ -78,7 +78,6 @@ Source: "launch-silent.vbs"; DestDir: "{app}"; Flags: ignoreversion
 Source: "launch.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "launch-flask.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "verify-installation.bat"; DestDir: "{app}"; Flags: ignoreversion
-Source: "download-easyocr-models.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === VISUAL C++ REDISTRIBUTABLE (requerido por PyTorch) ===
 Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall

@@ -160,7 +160,7 @@ function createWindow() {
 
   // Cargar la aplicación Flask
   const loadApp = () => {
-    mainWindow.loadURL(`http://localhost:${FLASK_PORT}`, {
+    mainWindow.loadURL(`http://127.0.0.1:${FLASK_PORT}`, {
       extraHeaders: 'pragma: no-cache\n'
     })
       .then(() => {
@@ -223,7 +223,7 @@ function startFlask() {
     const http = require('http');
     const checkFlaskAlive = () => {
       return new Promise((checkResolve) => {
-        const req = http.get(`http://localhost:${FLASK_PORT}`, { timeout: 2000 }, (res) => {
+        const req = http.get(`http://127.0.0.1:${FLASK_PORT}`, { timeout: 2000 }, (res) => {
           devLog('✅ Flask ya está corriendo en background');
           checkResolve(true);
         });
