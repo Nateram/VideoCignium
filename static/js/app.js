@@ -121,9 +121,6 @@ function loadView(viewName, evt) {
         case 'help':
             showHelpView();
             break;
-        case 'directo':
-            showDirectoInitView();
-            break;
     }
     
     appState.currentView = viewName;
@@ -258,26 +255,26 @@ async function loadSystemStatus() {
 
 // Vista: Carpetas y Videos (TreeView como en desktop)
 function showFoldersAndVideosView() {
-    updateViewTitle('<i class="fas fa-folder-open"></i> Carpetas y Videos');
+    updateViewTitle('<i class="fas fa-folder-open"></i> <span data-i18n="carpetas_videos">Carpetas y Videos</span>');
     
     const content = `
         <div class="folders-view">
             <div class="view-header">
-                <h3>Explorar Carpetas y Videos Analizados</h3>
+                <h3 data-i18n="explorar_carpetas_videos">Explorar Carpetas y Videos Analizados</h3>
                 <div class="header-controls">
                     <div class="search-box">
                         <i class="fas fa-search"></i>
-                        <input type="text" id="searchInput" placeholder="Buscar carpetas o videos..." onkeyup="filterTree()">
+                        <input type="text" id="searchInput" placeholder="Buscar carpetas o videos..." data-i18n-placeholder="buscar_carpetas_videos" onkeyup="filterTree()">
                     </div>
                     <select id="sortSelect" class="sort-select" onchange="sortTree()">
-                        <option value="name-asc">Nombre (A-Z)</option>
-                        <option value="name-desc">Nombre (Z-A)</option>
-                        <option value="date-desc">Más reciente</option>
-                        <option value="date-asc">Más antiguo</option>
-                        <option value="clips-desc">Más clips</option>
+                        <option value="name-asc" data-i18n="nombre_asc">Nombre (A-Z)</option>
+                        <option value="name-desc" data-i18n="nombre_desc">Nombre (Z-A)</option>
+                        <option value="date-desc" data-i18n="mas_reciente">Más reciente</option>
+                        <option value="date-asc" data-i18n="mas_antiguo">Más antiguo</option>
+                        <option value="clips-desc" data-i18n="mas_clips">Más clips</option>
                     </select>
                     <button class="btn btn-primary" onclick="loadFolders()">
-                        <i class="fas fa-sync"></i> Actualizar
+                        <i class="fas fa-sync"></i> <span data-i18n="actualizar">Actualizar</span>
                     </button>
                 </div>
             </div>
@@ -286,7 +283,7 @@ function showFoldersAndVideosView() {
             <div class="tree-panel-full">
                 <div class="treeview-container" id="treeview">
                     <div class="loading-message">
-                        <i class="fas fa-spinner fa-spin"></i> Cargando datos...
+                        <i class="fas fa-spinner fa-spin"></i> <span data-i18n="cargando_datos">Cargando datos...</span>
                     </div>
                 </div>
             </div>
@@ -295,6 +292,11 @@ function showFoldersAndVideosView() {
     
     document.getElementById('main-panel').innerHTML = content;
     loadFolders();
+    
+    // Actualizar traducciones para el contenido dinámico
+    if (typeof refreshTranslations === 'function') {
+        refreshTranslations();
+    }
 }
 
 // Actualizar título de la vista
@@ -429,20 +431,21 @@ function renderVideosWithSort(folderId, container, sortBy = 'name-asc') {
     }
     
     // Construir HTML con controles de ordenamiento
+    const videoText = sortedVideos.length !== 1 ? t('videos') : t('video');
     let html = `
         <div class="videos-sort-controls" style="margin-left: 30px; margin-bottom: 10px; padding: 8px; background: #f0f4f8; border-radius: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <span style="font-size: 0.85rem; color: #666; font-weight: 600;">
-                <i class="fas fa-sort"></i> Ordenar videos:
+                <i class="fas fa-sort"></i> <span data-i18n="ordenar_videos">${t('ordenar_videos')}</span>
             </span>
             <select onchange="renderVideosWithSort(${folderId}, document.getElementById('folder-${folderId}'), this.value)" 
                     style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 0.85rem; cursor: pointer;">
-                <option value="name-asc" ${sortBy === 'name-asc' ? 'selected' : ''}>📝 Nombre (A-Z)</option>
-                <option value="name-desc" ${sortBy === 'name-desc' ? 'selected' : ''}>📝 Nombre (Z-A)</option>
-                <option value="clips-desc" ${sortBy === 'clips-desc' ? 'selected' : ''}>🎬 Más clips</option>
-                <option value="clips-asc" ${sortBy === 'clips-asc' ? 'selected' : ''}>🎬 Menos clips</option>
+                <option value="name-asc" ${sortBy === 'name-asc' ? 'selected' : ''}>📝 ${t('nombre_az')}</option>
+                <option value="name-desc" ${sortBy === 'name-desc' ? 'selected' : ''}>📝 ${t('nombre_za')}</option>
+                <option value="clips-desc" ${sortBy === 'clips-desc' ? 'selected' : ''}>🎬 ${t('mas_clips')}</option>
+                <option value="clips-asc" ${sortBy === 'clips-asc' ? 'selected' : ''}>🎬 ${t('menos_clips')}</option>
             </select>
             <span style="font-size: 0.8rem; color: #999; margin-left: auto;">
-                ${sortedVideos.length} video${sortedVideos.length !== 1 ? 's' : ''}
+                ${sortedVideos.length} ${videoText}
             </span>
         </div>
     `;
@@ -453,9 +456,9 @@ function renderVideosWithSort(folderId, container, sortBy = 'name-asc') {
                 <div class="tree-item" onclick="toggleVideo(${video.id}, this)">
                     <span class="expand-icon">▶</span>
                     <i class="fas fa-file-video item-icon"></i>
-                    <span>${video.name} (${video.clip_count} clips)</span>
+                    <span>${video.name} (${video.clip_count} ${t('clips')})</span>
                 </div>
-                <button class="btn-icon-compact btn-danger" onclick="event.stopPropagation(); deleteVideo(${video.id}, '${video.name.replace(/'/g, "\\'")}' )" title="Eliminar video de BD (clips se borran del disco)">
+                <button class="btn-icon-compact btn-danger" onclick="event.stopPropagation(); deleteVideo(${video.id}, '${video.name.replace(/'/g, "\\'")}' )" title="${t('eliminar_video_bd')}">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>
@@ -490,7 +493,7 @@ async function toggleVideo(videoId, element) {
 
 // Cargar clips de un video
 async function loadClipsForVideo(videoId, container) {
-    container.innerHTML = '<div class="loading-message"><i class="fas fa-spinner fa-spin"></i> Cargando clips...</div>';
+    container.innerHTML = `<div class="loading-message"><i class="fas fa-spinner fa-spin"></i> <span data-i18n="cargando_clips">${t('cargando_clips')}</span></div>`;
     
     try {
         const response = await fetch(buildApiUrl(`/api/video/${videoId}/clips`));
@@ -500,7 +503,7 @@ async function loadClipsForVideo(videoId, container) {
             container.innerHTML = `
                 <div class="tree-item" style="margin-left: 60px; color: var(--light-text);">
                     <i class="fas fa-info-circle"></i>
-                    <span>No hay clips</span>
+                    <span data-i18n="no_hay_clips">${t('no_hay_clips')}</span>
                 </div>
             `;
             return;
@@ -515,7 +518,7 @@ async function loadClipsForVideo(videoId, container) {
         
     } catch (error) {
         console.error('Error cargando clips:', error);
-        container.innerHTML = '<div class="error-state">Error al cargar clips</div>';
+        container.innerHTML = `<div class="error-state" data-i18n="error_cargar_clips">${t('error_cargar_clips')}</div>`;
     }
 }
 
@@ -546,26 +549,27 @@ function renderClipsWithSort(videoId, container, sortBy = 'date-desc') {
     }
     
     // Construir HTML con controles de ordenamiento
+    const clipText = sortedClips.length !== 1 ? t('clips') : t('clip');
     let html = `
         <div class="clips-sort-controls" style="margin-left: 60px; margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <span style="font-size: 0.85rem; color: #666; font-weight: 600;">
-                <i class="fas fa-sort"></i> Ordenar:
+                <i class="fas fa-sort"></i> <span data-i18n="ordenar">${t('ordenar')}</span>
             </span>
             <select onchange="renderClipsWithSort(${videoId}, document.getElementById('video-${videoId}'), this.value)" 
                     style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 0.85rem; cursor: pointer;">
-                <option value="date-desc" ${sortBy === 'date-desc' ? 'selected' : ''}>📅 Fecha (Más reciente)</option>
-                <option value="date-asc" ${sortBy === 'date-asc' ? 'selected' : ''}>📅 Fecha (Más antigua)</option>
-                <option value="name-asc" ${sortBy === 'name-asc' ? 'selected' : ''}>🏷️ Objeto (A-Z)</option>
-                <option value="name-desc" ${sortBy === 'name-desc' ? 'selected' : ''}>🏷️ Objeto (Z-A)</option>
+                <option value="date-desc" ${sortBy === 'date-desc' ? 'selected' : ''}>📅 ${t('fecha_mas_reciente')}</option>
+                <option value="date-asc" ${sortBy === 'date-asc' ? 'selected' : ''}>📅 ${t('fecha_mas_antigua')}</option>
+                <option value="name-asc" ${sortBy === 'name-asc' ? 'selected' : ''}>🏷️ ${t('objeto_az')}</option>
+                <option value="name-desc" ${sortBy === 'name-desc' ? 'selected' : ''}>🏷️ ${t('objeto_za')}</option>
             </select>
             <span style="font-size: 0.8rem; color: #999; margin-left: auto;">
-                ${sortedClips.length} clip${sortedClips.length !== 1 ? 's' : ''}
+                ${sortedClips.length} ${clipText}
             </span>
         </div>
     `;
     
     sortedClips.forEach(clip => {
-        const objectInfo = clip.object_type ? `${clip.object_type}` : 'Sin clasificar';
+        const objectInfo = clip.object_type ? `${clip.object_type}` : t('sin_clasificar');
         const colorInfo = clip.object_color ? ` (${clip.object_color})` : '';
         
         html += `
@@ -594,7 +598,7 @@ async function showClipDetails(clipId) {
         const data = await response.json();
         
         if (!data.success) {
-            showNotification('Error al cargar detalles del clip', 'error');
+            showNotification(t('error_cargar_detalles_clip'), 'error');
             return;
         }
         
@@ -606,7 +610,7 @@ async function showClipDetails(clipId) {
         
     } catch (error) {
         console.error('Error cargando detalles del clip:', error);
-        showNotification('Error al cargar detalles del clip', 'error');
+        showNotification(t('error_cargar_detalles_clip'), 'error');
     }
 }
 
@@ -617,7 +621,7 @@ function showClipModal(clip) {
     const hasClip = clip.has_clip !== false && clipUrl !== null;  // Si has_clip existe, usarlo; sino, verificar URL
     
     // Título del modal según si tiene clip o no
-    const modalTitle = hasClip ? 'Detalles del Clip' : 'Detalles del Evento';
+    const modalTitle = hasClip ? t('detalles_clip') : t('detalles_evento');
     const modalIcon = hasClip ? 'fa-film' : 'fa-calendar-check';
     
     const modalHTML = `
@@ -636,7 +640,7 @@ function showClipModal(clip) {
                     <div class="clip-player-container">
                         <video id="clipVideoPlayer" controls autoplay class="clip-video">
                             <source src="${clipUrl}" type="video/mp4">
-                            Tu navegador no soporta el reproductor de video.
+                            <span data-i18n="navegador_no_soporta">${t('navegador_no_soporta')}</span>
                         </video>
                     </div>
                     ` : ''}
@@ -645,15 +649,15 @@ function showClipModal(clip) {
                     <div class="clip-info-grid" id="clipInfoGrid">
                         <div class="clip-info-item">
                             <div class="clip-info-label">
-                                <i class="fas fa-calendar"></i> Fecha del Evento
+                                <i class="fas fa-calendar"></i> <span data-i18n="fecha_evento">${t('fecha_evento')}</span>
                             </div>
                             <div class="clip-info-value-container">
                                 <div class="clip-info-value editable-field" id="clipTimestamp-${clip.id}" 
                                      ondblclick="makeFieldEditable('timestamp', ${clip.id}, 'clipTimestamp-${clip.id}')">
-                                    ${clip.timestamp || 'No disponible'}
+                                    ${clip.timestamp || t('no_disponible')}
                                 </div>
                                 <button class="edit-field-btn" onclick="makeFieldEditable('timestamp', ${clip.id}, 'clipTimestamp-${clip.id}')" 
-                                        title="Editar fecha">
+                                        title="${t('editar_fecha')}">
                                     <i class="fas fa-edit"></i>
                                 </button>
                             </div>
@@ -661,7 +665,7 @@ function showClipModal(clip) {
                         
                         <div class="clip-info-item">
                             <div class="clip-info-label">
-                                <i class="fas fa-clock"></i> Tiempo en Video
+                                <i class="fas fa-clock"></i> <span data-i18n="tiempo_video">${t('tiempo_video')}</span>
                             </div>
                             <div class="clip-info-value" id="clipVideoTime">
                                 ${clip.tiempo_video || '00:00'}
@@ -670,15 +674,15 @@ function showClipModal(clip) {
                         
                         <div class="clip-info-item">
                             <div class="clip-info-label">
-                                <i class="fas fa-cube"></i> Objeto Detectado
+                                <i class="fas fa-cube"></i> <span data-i18n="objeto_detectado">${t('objeto_detectado')}</span>
                             </div>
                             <div class="clip-info-value-container">
                                 <div class="clip-info-value editable-field" id="clipObject-${clip.id}" 
                                      ondblclick="makeFieldEditable('object', ${clip.id}, 'clipObject-${clip.id}')">
-                                    ${clip.detected_object || 'Sin clasificar'}
+                                    ${clip.detected_object || t('sin_clasificar')}
                                 </div>
                                 <button class="edit-field-btn" onclick="makeFieldEditable('object', ${clip.id}, 'clipObject-${clip.id}')" 
-                                        title="Editar objeto">
+                                        title="${t('editar_objeto')}">
                                     <i class="fas fa-edit"></i>
                                 </button>
                             </div>
@@ -686,15 +690,15 @@ function showClipModal(clip) {
                         
                         <div class="clip-info-item">
                             <div class="clip-info-label">
-                                <i class="fas fa-palette"></i> Color
+                                <i class="fas fa-palette"></i> <span data-i18n="color">${t('color')}</span>
                             </div>
                             <div class="clip-info-value-container">
                                 <div class="clip-info-value editable-field" id="clipColor-${clip.id}" 
                                      ondblclick="makeFieldEditable('color', ${clip.id}, 'clipColor-${clip.id}')">
-                                    ${clip.color || 'No detectado'}
+                                    ${clip.color || t('no_detectado')}
                                 </div>
                                 <button class="edit-field-btn" onclick="makeFieldEditable('color', ${clip.id}, 'clipColor-${clip.id}')" 
-                                        title="Editar color">
+                                        title="${t('editar_color')}">
                                     <i class="fas fa-edit"></i>
                                 </button>
                             </div>
@@ -702,7 +706,7 @@ function showClipModal(clip) {
                         
                         <div class="clip-info-item full-width">
                             <div class="clip-info-label">
-                                <i class="fas fa-file"></i> Archivo
+                                <i class="fas fa-file"></i> <span data-i18n="archivo">${t('archivo')}</span>
                             </div>
                             <div class="clip-info-value clip-filename">
                                 ${clip.nombre}
@@ -714,11 +718,11 @@ function showClipModal(clip) {
                     <div class="clip-actions">
                         ${hasClip ? `
                         <button class="btn-action btn-primary" onclick="downloadClip('${clipUrl}', '${clip.nombre}')">
-                            <i class="fas fa-download"></i> Descargar Clip
+                            <i class="fas fa-download"></i> <span data-i18n="descargar_clip">${t('descargar_clip')}</span>
                         </button>
                         ` : ''}
                         <button class="btn-action btn-danger" onclick="deleteClipFromModal(${clip.id})">
-                            <i class="fas fa-trash"></i> ${hasClip ? 'Eliminar Clip' : 'Eliminar Evento'}
+                            <i class="fas fa-trash"></i> <span data-i18n="${hasClip ? 'eliminar_clip' : 'eliminar_evento'}">${hasClip ? t('eliminar_clip') : t('eliminar_evento')}</span>
                         </button>
                     </div>
                 </div>
@@ -1068,42 +1072,42 @@ function showSelectFolderView() {
             <div class="upload-card-wide">
                 <!-- Opciones de Procesamiento ARRIBA -->
                 <div class="processing-options-horizontal">
-                    <h3><i class="fas fa-sliders-h"></i> Opciones de Análisis</h3>
+                    <h3><i class="fas fa-sliders-h"></i> <span data-i18n="opciones_analisis">Opciones de Análisis</span></h3>
                     <div class="options-row">
                         <div class="option-compact">
                             <i class="fas fa-tachometer-alt" style="color: var(--info-color);"></i>
-                            <span>Movimiento</span>
+                            <span data-i18n="movimiento">Movimiento</span>
                             <span class="badge-always">ON</span>
                         </div>
                         <label class="option-compact option-toggle-horizontal">
                             <input type="checkbox" id="folderGenerateClipsOption" checked>
                             <span class="toggle-slider-small"></span>
                             <i class="fas fa-cut" style="color: var(--warning-color);"></i>
-                            <span>Clips</span>
+                            <span data-i18n="clips">Clips</span>
                         </label>
                         <label class="option-compact option-toggle-horizontal">
                             <input type="checkbox" id="folderUseAiAnalysisOption" checked>
                             <span class="toggle-slider-small"></span>
                             <i class="fas fa-brain" style="color: var(--secondary-color);"></i>
-                            <span>IA</span>
+                            <span data-i18n="ia">IA</span>
                         </label>
                     </div>
                 </div>
 
                 <h2 style="text-align: center; margin: 20px 0 15px 0; font-size: 1.2rem;">
-                    <i class="fas fa-folder-open"></i> Selecciona una carpeta con videos
+                    <i class="fas fa-folder-open"></i> <span data-i18n="selecciona_carpeta_videos">Selecciona una carpeta con videos</span>
                 </h2>
                 
                 <div class="upload-drop-zone" id="folderDropZone">
                     <i class="fas fa-cloud-upload-alt"></i>
-                    <p><strong>Arrastra una carpeta aquí</strong></p>
-                    <p class="upload-hint">o haz clic para seleccionar</p>
+                    <p><strong data-i18n="arrastra_carpeta">Arrastra una carpeta aquí</strong></p>
+                    <p class="upload-hint" data-i18n="haz_clic_seleccionar">o haz clic para seleccionar</p>
                     <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
                 </div>
                 
                 <button class="btn-upload btn-green" onclick="document.getElementById('folderInput').click()">
                     <i class="fas fa-folder-plus"></i>
-                    Seleccionar Carpeta
+                    <span data-i18n="seleccionar_carpeta">Seleccionar Carpeta</span>
                 </button>
                 
                 <div id="folderFileList" class="file-preview" style="display: none;"></div>
@@ -1113,7 +1117,7 @@ function showSelectFolderView() {
                         <div class="progress-bar">
                             <div class="progress-fill" id="folderUploadProgress">0%</div>
                         </div>
-                        <p class="progress-text" id="folderUploadText">Subiendo archivos...</p>
+                        <p class="progress-text" id="folderUploadText" data-i18n="subiendo_archivos">Subiendo archivos...</p>
                     </div>
                 </div>
             </div>
@@ -1266,49 +1270,49 @@ function showSelectFolderView() {
 
 // Vista: Seleccionar Video Individual
 function showSelectVideoView() {
-    updateViewTitle('🎥 Analizar Video Individual');
+    updateViewTitle('🎥 <span data-i18n="analizar_video_individual">Analizar Video Individual</span>');
     
     const content = `
         <div class="upload-container-full">
             <div class="upload-card-wide">
                 <!-- Opciones de Procesamiento ARRIBA -->
                 <div class="processing-options-horizontal">
-                    <h3><i class="fas fa-sliders-h"></i> Opciones de Análisis</h3>
+                    <h3><i class="fas fa-sliders-h"></i> <span data-i18n="opciones_analisis">Opciones de Análisis</span></h3>
                     <div class="options-row">
                         <div class="option-compact">
                             <i class="fas fa-tachometer-alt" style="color: var(--info-color);"></i>
-                            <span>Movimiento</span>
+                            <span data-i18n="movimiento">Movimiento</span>
                             <span class="badge-always">ON</span>
                         </div>
                         <label class="option-compact option-toggle-horizontal">
                             <input type="checkbox" id="videoGenerateClipsOption" checked>
                             <span class="toggle-slider-small"></span>
                             <i class="fas fa-cut" style="color: var(--warning-color);"></i>
-                            <span>Clips</span>
+                            <span data-i18n="clips">Clips</span>
                         </label>
                         <label class="option-compact option-toggle-horizontal">
                             <input type="checkbox" id="videoUseAiAnalysisOption" checked>
                             <span class="toggle-slider-small"></span>
                             <i class="fas fa-brain" style="color: var(--secondary-color);"></i>
-                            <span>IA</span>
+                            <span data-i18n="ia">IA</span>
                         </label>
                     </div>
                 </div>
 
                 <h2 style="text-align: center; margin: 20px 0 15px 0; font-size: 1.2rem;">
-                    <i class="fas fa-video"></i> Selecciona uno o más videos
+                    <i class="fas fa-video"></i> <span data-i18n="selecciona_videos">Selecciona uno o más videos</span>
                 </h2>
                 
                 <div class="upload-drop-zone" id="videoDropZone">
                     <i class="fas fa-cloud-upload-alt"></i>
-                    <p><strong>Arrastra videos aquí</strong></p>
-                    <p class="upload-hint">o haz clic para seleccionar</p>
+                    <p><strong data-i18n="arrastra_videos">Arrastra videos aquí</strong></p>
+                    <p class="upload-hint" data-i18n="haz_clic_seleccionar">o haz clic para seleccionar</p>
                     <input type="file" id="videoInput" multiple accept=".mp4,.avi,.mov,.dav,.mkv" style="display: none;">
                 </div>
                 
                 <button class="btn-upload btn-orange" onclick="document.getElementById('videoInput').click()">
                     <i class="fas fa-file-video"></i>
-                    Seleccionar Videos
+                    <span data-i18n="seleccionar_videos">Seleccionar Videos</span>
                 </button>
                 
                 <div id="videoFileList" class="file-preview" style="display: none;"></div>
@@ -1318,7 +1322,7 @@ function showSelectVideoView() {
                         <div class="progress-bar">
                             <div class="progress-fill" id="videoUploadProgress">0%</div>
                         </div>
-                        <p class="progress-text" id="videoUploadText">Subiendo videos...</p>
+                        <p class="progress-text" id="videoUploadText" data-i18n="subiendo_videos">Subiendo videos...</p>
                     </div>
                 </div>
             </div>
@@ -1549,13 +1553,13 @@ function displaySelectedFiles(files, containerId, type) {
     const videoFiles = files.filter(file => isVideoFile(file.name));
     
     if (videoFiles.length === 0) {
-        showNotification('No se encontraron videos válidos', 'warning');
+        showNotification(t('no_videos_validos'), 'warning');
         return;
     }
     
     let html = `
         <div class="file-list-header">
-            <h3><i class="fas fa-list"></i> ${videoFiles.length} archivo(s) seleccionado(s)</h3>
+            <h3><i class="fas fa-list"></i> ${videoFiles.length} <span data-i18n="archivos_seleccionados">${t('archivos_seleccionados')}</span></h3>
         </div>
         <div class="file-list-items">
     `;
@@ -1573,11 +1577,12 @@ function displaySelectedFiles(files, containerId, type) {
         `;
     });
     
+    const videoText = videoFiles.length > 1 ? t('videos') : t('video');
     html += `
         </div>
         <button class="btn-upload btn-primary" onclick="uploadFiles('${type}')">
             <i class="fas fa-upload"></i>
-            Subir y Analizar (${videoFiles.length} video${videoFiles.length > 1 ? 's' : ''})
+            <span data-i18n="subir_analizar">${t('subir_analizar')}</span> (${videoFiles.length} ${videoText})
         </button>
     `;
     
@@ -1892,7 +1897,7 @@ function startProcessingPolling() {
             if (status.queue && status.queue.pending_jobs > 0) {
                 const queueInfo = document.getElementById('queueInfo');
                 if (queueInfo) {
-                    queueInfo.textContent = `Cola: ${status.queue.pending_jobs} trabajo(s) pendiente(s)`;
+                    queueInfo.textContent = `${t('cola')}: ${status.queue.pending_jobs} ${t('trabajos_pendientes')}`;
                     queueInfo.style.display = 'block';
                 }
             }
@@ -2012,17 +2017,17 @@ function showStartingProcessingView() {
     const content = `
         <div class="processing-container">
             <div class="processing-card">
-                <h2><i class="fas fa-play-circle"></i> Iniciando Análisis</h2>
+                <h2><i class="fas fa-play-circle"></i> <span data-i18n="iniciando_analisis">${t('iniciando_analisis')}</span></h2>
                 
                 <div class="processing-info-card">
                     <div class="processing-spinner">
                         <i class="fas fa-circle-notch fa-spin" style="font-size: 3rem; color: var(--primary-color);"></i>
                     </div>
                     <p style="margin-top: 20px; font-size: 1.1rem;">
-                        <i class="fas fa-rocket"></i> Preparando el procesamiento...
+                        <i class="fas fa-rocket"></i> <span data-i18n="preparando_procesamiento">${t('preparando_procesamiento')}</span>
                     </p>
-                    <p style="margin-top: 10px; color: var(--text-secondary);">
-                        El análisis comenzará en unos momentos
+                    <p style="margin-top: 10px; color: var(--text-secondary);" data-i18n="analisis_comenzara">
+                        ${t('analisis_comenzara')}
                     </p>
                 </div>
                 
@@ -2030,22 +2035,22 @@ function showStartingProcessingView() {
                     <div class="processing-stat-box">
                         <div class="stat-icon"><i class="fas fa-video"></i></div>
                         <div class="stat-value" id="videosProcessed">0</div>
-                        <div class="stat-label">Videos procesados</div>
+                        <div class="stat-label" data-i18n="videos_procesados">${t('videos_procesados')}</div>
                     </div>
                     <div class="processing-stat-box">
                         <div class="stat-icon"><i class="fas fa-running"></i></div>
                         <div class="stat-value" id="motionEventsDetected">0</div>
-                        <div class="stat-label">Movimientos</div>
+                        <div class="stat-label" data-i18n="movimientos">${t('movimientos')}</div>
                     </div>
                     <div class="processing-stat-box">
                         <div class="stat-icon"><i class="fas fa-cut"></i></div>
                         <div class="stat-value" id="clipsGenerated">0</div>
-                        <div class="stat-label">Clips generados</div>
+                        <div class="stat-label" data-i18n="clips_generados">${t('clips_generados')}</div>
                     </div>
                     <div class="processing-stat-box">
                         <div class="stat-icon"><i class="fas fa-brain"></i></div>
                         <div class="stat-value" id="objectsDetected">0</div>
-                        <div class="stat-label">Objetos IA</div>
+                        <div class="stat-label" data-i18n="objetos_ia">${t('objetos_ia')}</div>
                     </div>
                 </div>
             </div>
@@ -2146,15 +2151,15 @@ function showNoProcessingView() {
                     <i class="fas fa-inbox"></i>
                 </div>
                 
-                <h2>No hay análisis en proceso</h2>
-                <p class="no-processing-description">
+                <h2 data-i18n="no_hay_analisis_proceso">No hay análisis en proceso</h2>
+                <p class="no-processing-description" data-i18n="selecciona_videos_carpeta">
                     Selecciona videos o una carpeta para iniciar un nuevo análisis
                 </p>
                 
                 <div class="action-buttons-row">
                     <button class="btn-action btn-green" onclick="loadView('select-folder', event)">
                         <i class="fas fa-folder-open"></i>
-                        Seleccionar Carpeta
+                        <span data-i18n="seleccionar_carpeta">Seleccionar Carpeta</span>
                     </button>
                     <button class="btn-action btn-orange" onclick="loadView('select-video', event)">
                         <i class="fas fa-video"></i>
@@ -2367,7 +2372,7 @@ function showActiveProcessingView(status) {
         
         queueHTML = `
             <div class="queue-info-panel">
-                <h3><i class="fas fa-list"></i> Tareas (${totalTasks})</h3>
+                <h3><i class="fas fa-list"></i> <span data-i18n="tareas">${t('tareas')}</span> (${totalTasks})</h3>
                 <div class="queue-tasks-list">
                     ${allTasks.map(task => `
                         <div class="queue-task-item ${task.is_current ? 'current-task' : ''} ${task.is_completed ? 'completed-task' : ''}">
@@ -2375,8 +2380,8 @@ function showActiveProcessingView(status) {
                             <div class="task-details">
                                 <div class="task-name">${task.folder_name}</div>
                                 <div class="task-meta">
-                                    <span><i class="fas fa-video"></i> ${task.video_count} videos</span>
-                                    ${task.is_current ? '<span class="current-badge">En proceso</span>' : ''}
+                                    <span><i class="fas fa-video"></i> ${task.video_count} <span data-i18n="videos">${t('videos')}</span></span>
+                                    ${task.is_current ? '<span class="current-badge" data-i18n="en_proceso">' + t('en_proceso') + '</span>' : ''}
                                     ${task.is_completed ? '<i class="fas fa-check-circle" style="color: var(--success-color); font-size: 1.2rem;"></i>' : ''}
                                     ${!task.is_current && !task.is_completed && task.generate_clips ? '<span><i class="fas fa-cut"></i> Clips</span>' : ''}
                                     ${!task.is_current && !task.is_completed && task.use_ai_analysis ? '<span><i class="fas fa-brain"></i> IA</span>' : ''}
@@ -2398,28 +2403,28 @@ function showActiveProcessingView(status) {
                     <i class="fas fa-cog fa-spin"></i>
                 </div>
                 
-                <h2>Analizando: ${status.current_folder || 'Videos'}</h2>
+                <h2><span data-i18n="analizando">${t('analizando')}</span>: ${status.current_folder || 'Videos'}</h2>
                 <p class="processing-description">
-                    ${status.current_video || 'Procesando videos...'}
-                    ${status.total_videos > 0 ? `<br><small>Total: ${status.videos_processed_in_job || 0}/${status.total_videos} videos</small>` : ''}
+                    ${status.current_video || t('procesando_videos')}
+                    ${status.total_videos > 0 ? `<br><small><span data-i18n="total">${t('total')}</span>: ${status.videos_processed_in_job || 0}/${status.total_videos} <span data-i18n="videos">${t('videos')}</span></small>` : ''}
                 </p>
                 
                 <div class="processing-stats">
                     <div class="stat-item">
                         <div class="stat-value" id="videosProcessed">0</div>
-                        <div class="stat-label">Videos Procesados</div>
+                        <div class="stat-label" data-i18n="videos_procesados">${t('videos_procesados')}</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="motionEventsDetected">0</div>
-                        <div class="stat-label">Movimientos Detectados</div>
+                        <div class="stat-label" data-i18n="movimientos_detectados">${t('movimientos_detectados')}</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="clipsGenerated">0</div>
-                        <div class="stat-label">Clips Generados</div>
+                        <div class="stat-label" data-i18n="clips_generados">${t('clips_generados')}</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="objectsDetected">0</div>
-                        <div class="stat-label">Objetos Detectados</div>
+                        <div class="stat-label" data-i18n="objetos_detectados">${t('objetos_detectados')}</div>
                     </div>
                 </div>
             </div>
@@ -2444,8 +2449,8 @@ function showROIConfigView() {
                 <div style="display: flex; align-items: flex-start; gap: 16px;">
                     <span style="font-size: 2.5em;">ℹ️</span>
                     <div style="flex: 1;">
-                        <h3 style="margin: 0; color: #fff; font-size: 1.3em; font-weight: 600;">¿Cómo funciona la Zona de Hora?</h3>
-                        <p style="margin: 12px 0 0 0; color: #fff; opacity: 0.95; font-size: 1em; line-height: 1.6;">
+                        <h3 style="margin: 0; color: #fff; font-size: 1.3em; font-weight: 600;" data-i18n="como_funciona_zona_hora">¿Cómo funciona la Zona de Hora?</h3>
+                        <p style="margin: 12px 0 0 0; color: #fff; opacity: 0.95; font-size: 1em; line-height: 1.6;" data-i18n="explicacion_zona_hora">
                             <strong>1. Sube un video:</strong> Selecciona cualquier video de tu cámara para usar como referencia.<br>
                             <strong>2. Dibuja el área:</strong> Arrastra el ratón sobre la imagen para marcar <strong>dónde aparece la fecha/hora</strong> en tus videos.<br>
                             <strong>3. Guarda:</strong> El sistema usará esta zona para extraer automáticamente la fecha y hora real de cada evento detectado.<br><br>
@@ -2462,32 +2467,32 @@ function showROIConfigView() {
                 <!-- Área de carga de video -->
                 <div class="video-upload-button-area" id="videoUploadArea">
                     <i class="fas fa-video" style="font-size: 3rem; color: var(--secondary-color); margin-bottom: 15px;"></i>
-                    <h3 style="color: var(--dark-text); margin-bottom: 10px;">Subir Video de Referencia</h3>
-                    <p class="upload-hint">Sube un video para extraer un frame y definir la zona de hora</p>
+                    <h3 style="color: var(--dark-text); margin-bottom: 10px;" data-i18n="sube_video_referencia">Subir Video de Referencia</h3>
+                    <p class="upload-hint" data-i18n="sube_video_extraer_frame">Sube un video para extraer un frame y definir la zona de hora</p>
                     <button class="btn btn-primary" onclick="document.getElementById('roiVideoInput').click()" style="margin-top: 20px;">
-                        <i class="fas fa-upload"></i> Seleccionar Video
+                        <i class="fas fa-upload"></i> <span data-i18n="seleccionar_video">Seleccionar Video</span>
                     </button>
                     <input type="file" id="roiVideoInput" accept=".mp4,.avi,.mov,.dav,.mkv" style="display: none;" onchange="loadROIVideo(event)">
                 </div>
                 
                 <!-- Coordenadas ARRIBA del video (oculto inicialmente) -->
                 <div class="roi-coordinates-section" id="coordinatesSection" style="display: none;">
-                    <h3><i class="fas fa-ruler-combined"></i> Coordenadas de la Zona</h3>
+                    <h3><i class="fas fa-ruler-combined"></i> <span data-i18n="coordenadas_zona">${t('coordenadas_zona')}</span></h3>
                     <div class="roi-controls">
                         <div class="form-group">
-                            <label>Posición X:</label>
+                            <label data-i18n="posicion_x">${t('posicion_x')}</label>
                             <input type="number" id="roiX" class="form-control" value="0" min="0" oninput="updateROIPreview()">
                         </div>
                         <div class="form-group">
-                            <label>Posición Y:</label>
+                            <label data-i18n="posicion_y">${t('posicion_y')}</label>
                             <input type="number" id="roiY" class="form-control" value="0" min="0" oninput="updateROIPreview()">
                         </div>
                         <div class="form-group">
-                            <label>Ancho (W):</label>
+                            <label data-i18n="ancho_w">${t('ancho_w')}</label>
                             <input type="number" id="roiW" class="form-control" value="200" min="1" oninput="updateROIPreview()">
                         </div>
                         <div class="form-group">
-                            <label>Alto (H):</label>
+                            <label data-i18n="alto_h">${t('alto_h')}</label>
                             <input type="number" id="roiH" class="form-control" value="80" min="1" oninput="updateROIPreview()">
                         </div>
                     </div>
@@ -2495,15 +2500,15 @@ function showROIConfigView() {
                     <!-- Botones de acción DEBAJO de las coordenadas -->
                     <div class="roi-actions-horizontal" style="margin-top: 20px;">
                         <button class="btn btn-success" onclick="saveROIConfig()" style="flex: 1;">
-                            <i class="fas fa-save"></i> Guardar Configuración
+                            <i class="fas fa-save"></i> <span data-i18n="guardar_config">${t('guardar_config')}</span>
                         </button>
                         <button class="btn btn-secondary" onclick="resetROIConfig()" style="flex: 1;">
-                            <i class="fas fa-undo"></i> Restablecer Valores
+                            <i class="fas fa-undo"></i> <span data-i18n="restablecer_valores">${t('restablecer_valores')}</span>
                         </button>
                     </div>
                     
                     <div class="roi-saved-config" id="savedConfigCard" style="display: none; margin-top: 15px;">
-                        <h4><i class="fas fa-check-circle" style="color: var(--success-color);"></i> Configuración Guardada</h4>
+                        <h4><i class="fas fa-check-circle" style="color: var(--success-color);"></i> <span data-i18n="config_guardada">${t('config_guardada')}</span></h4>
                         <p id="savedConfigText" style="font-size: 0.85rem; color: var(--light-text); margin: 10px 0 0 0;"></p>
                     </div>
                 </div>
@@ -2514,19 +2519,19 @@ function showROIConfigView() {
                         <canvas id="roiCanvas" width="1000" height="600"></canvas>
                         <div class="canvas-instructions">
                             <i class="fas fa-mouse-pointer"></i>
-                            <span>Arrastra con el mouse para dibujar la zona de hora</span>
+                            <span data-i18n="arrastra_dibujar_zona_hora">${t('arrastra_dibujar_zona_hora')}</span>
                         </div>
                     </div>
                     
                     <div class="video-controls" style="margin-top: 15px;">
-                        <button class="btn-icon" id="playPauseBtn" onclick="pauseROIVideo()" title="Reproducir/Pausar">
+                        <button class="btn-icon" id="playPauseBtn" onclick="pauseROIVideo()" title="${t('reproducir_pausar')}">
                             <i class="fas fa-play"></i>
                         </button>
                         <input type="range" id="videoSeekBar" min="0" max="100" value="0" style="flex: 1;">
-                        <button class="btn-icon" onclick="captureFrame()" title="Capturar frame actual">
+                        <button class="btn-icon" onclick="captureFrame()" title="${t('capturar_frame')}">
                             <i class="fas fa-camera"></i>
                         </button>
-                        <button class="btn-icon btn-danger" onclick="clearROI()" title="Limpiar y reiniciar">
+                        <button class="btn-icon btn-danger" onclick="clearROI()" title="${t('limpiar_reiniciar')}">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -2550,50 +2555,50 @@ function showAdvancedConfigView() {
     const content = `
         <div class="config-container">
             <div class="config-card">
-                <h2><i class="fas fa-cog"></i> Parámetros de Detección de Movimiento</h2>
-                <p class="config-description">
+                <h2><i class="fas fa-cog"></i> <span data-i18n="parametros_deteccion_movimiento">Parámetros de Detección de Movimiento</span></h2>
+                <p class="config-description" data-i18n="ajusta_parametros">
                     Ajusta los parámetros para optimizar la detección según tus necesidades. Valores más bajos = mayor sensibilidad.
                 </p>
                 
                 <div class="advanced-settings">
                     <div class="setting-group">
-                        <label><i class="fas fa-percentage"></i> Umbral de Porcentaje de Cambio:</label>
+                        <label><i class="fas fa-percentage"></i> <span data-i18n="umbral_porcentaje_cambio">Umbral de Porcentaje de Cambio:</span></label>
                         <input type="number" id="thresholdPercentage" value="0.5" step="0.1" min="0.1" max="10" class="form-control">
-                        <small><strong>¿Qué es?</strong> Porcentaje mínimo de píxeles que deben cambiar en la imagen para considerar que hay movimiento.</small>
+                        <small><strong data-i18n="que_es_porcentaje">¿Qué es?</strong> <span data-i18n="explicacion_porcentaje">Porcentaje mínimo de píxeles que deben cambiar en la imagen para considerar que hay movimiento.</span></small>
                         <small style="display: block; margin-top: 5px; color: #3B82F6;">
-                            <i class="fas fa-lightbulb"></i> <strong>Recomendación:</strong> 0.5% para detección normal | 0.3% para alta sensibilidad | 1.0% para ignorar movimientos leves
+                            <i class="fas fa-lightbulb"></i> <strong data-i18n="recomendacion">Recomendación:</strong> <span data-i18n="recomendacion_porcentaje">0.5% para detección normal | 0.3% para alta sensibilidad | 1.0% para ignorar movimientos leves</span>
                         </small>
                     </div>
                     
                     <div class="setting-group">
-                        <label><i class="fas fa-adjust"></i> Umbral de Varianza:</label>
+                        <label><i class="fas fa-adjust"></i> <span data-i18n="umbral_varianza">Umbral de Varianza:</span></label>
                         <input type="number" id="varThreshold" value="16" step="1" min="1" max="100" class="form-control">
-                        <small><strong>¿Qué es?</strong> Sensibilidad del algoritmo para distinguir entre fondo y movimiento. Controla cuánto debe diferir un píxel del fondo para considerarse "en movimiento".</small>
+                        <small><strong data-i18n="que_es_varianza">¿Qué es?</strong> <span data-i18n="explicacion_varianza">Sensibilidad del algoritmo para distinguir entre fondo y movimiento. Controla cuánto debe diferir un píxel del fondo para considerarse "en movimiento".</span></small>
                         <small style="display: block; margin-top: 5px; color: #3B82F6;">
-                            <i class="fas fa-lightbulb"></i> <strong>Recomendación:</strong> 16 para detección estándar | 8-12 para alta sensibilidad | 25-40 para ignorar cambios de luz
+                            <i class="fas fa-lightbulb"></i> <strong data-i18n="recomendacion">Recomendación:</strong> <span data-i18n="recomendacion_varianza">16 para detección estándar | 8-12 para alta sensibilidad | 25-40 para ignorar cambios de luz</span>
                         </small>
                     </div>
                     
                     <div class="setting-group">
-                        <label><i class="fas fa-clock"></i> Tiempo de Enfriamiento:</label>
+                        <label><i class="fas fa-clock"></i> <span data-i18n="tiempo_enfriamiento">Tiempo de Enfriamiento:</span></label>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <input type="number" id="cooldownMs" value="8000" step="1000" min="1000" max="60000" class="form-control" style="flex: 1;" oninput="updateCooldownDisplay(this.value)">
                             <span id="cooldownSeconds" style="min-width: 80px; font-weight: bold; color: #3B82F6;">8 segundos</span>
                         </div>
-                        <small><strong>¿Qué es?</strong> Tiempo mínimo que debe pasar entre dos detecciones consecutivas. Evita crear múltiples clips para el mismo evento.</small>
+                        <small><strong data-i18n="que_es_enfriamiento">¿Qué es?</strong> <span data-i18n="explicacion_enfriamiento">Tiempo mínimo que debe pasar entre dos detecciones consecutivas. Evita crear múltiples clips para el mismo evento.</span></small>
                         <small style="display: block; margin-top: 5px; color: #3B82F6;">
-                            <i class="fas fa-lightbulb"></i> <strong>Recomendación:</strong> 8 seg (8000ms) para eventos normales | 3-5 seg para movimientos rápidos | 10-15 seg para eventos largos
+                            <i class="fas fa-lightbulb"></i> <strong data-i18n="recomendacion">Recomendación:</strong> <span data-i18n="recomendacion_enfriamiento">8 seg (8000ms) para eventos normales | 3-5 seg para movimientos rápidos | 10-15 seg para eventos largos</span>
                         </small>
                     </div>
                     
                     <div class="setting-group" id="localFolderSettingGroup" style="display:none">
                         <label>
                             <input type="checkbox" id="duplicateFiles" checked>
-                            <i class="fas fa-copy"></i> Duplicar archivos al seleccionar carpeta local
+                            <i class="fas fa-copy"></i> <span data-i18n="duplicar_archivos">Duplicar archivos al seleccionar carpeta local</span>
                         </label>
-                        <small><strong>¿Qué es?</strong> Cuando está activado, los videos se copian a la carpeta de trabajo antes de analizarse. Cuando está desactivado, se analizan directamente desde su ubicación original.</small>
+                        <small><strong data-i18n="que_es">¿Qué es?</strong> <span data-i18n="duplicar_explicacion">Cuando está activado, los videos se copian a la carpeta de trabajo antes de analizarse. Cuando está desactivado, se analizan directamente desde su ubicación original.</span></small>
                         <small style="display: block; margin-top: 5px; color: #3B82F6;">
-                            <i class="fas fa-lightbulb"></i> <strong>Nota:</strong> Desactivar ahorra espacio en disco, pero requiere mantener los videos en su ubicación original.
+                            <i class="fas fa-lightbulb"></i> <strong data-i18n="nota">Nota:</strong> <span data-i18n="duplicar_nota">Desactivar ahorra espacio en disco, pero requiere mantener los videos en su ubicación original.</span>
                         </small>
                     </div>
                 </div>
@@ -2601,11 +2606,11 @@ function showAdvancedConfigView() {
                 <div class="config-actions">
                     <button class="btn-config btn-primary" onclick="saveAdvancedConfig()">
                         <i class="fas fa-save"></i>
-                        Guardar Configuración
+                        <span data-i18n="guardar_configuracion">Guardar Configuración</span>
                     </button>
                     <button class="btn-config btn-secondary" onclick="resetAdvancedConfig()">
                         <i class="fas fa-undo"></i>
-                        Valores por Defecto
+                        <span data-i18n="valores_por_defecto">Valores por Defecto</span>
                     </button>
                 </div>
             </div>
@@ -2633,7 +2638,7 @@ function showAdvancedConfigView() {
 }
 
 function showExcelView() {
-    updateViewTitle('<i class="fas fa-file-excel"></i> Excel de Sesión');
+    updateViewTitle('<i class="fas fa-file-excel"></i> <span data-i18n="excel_sesion">Excel de Sesión</span>');
     
     const content = `
         <div class="excel-container">
@@ -2641,7 +2646,7 @@ function showExcelView() {
             <div class="excel-config-header">
                 <div class="excel-config-row">
                     <div class="config-group">
-                        <label><i class="fas fa-text-height"></i> Fuente:</label>
+                        <label><i class="fas fa-text-height"></i> <span data-i18n="fuente">Fuente:</span></label>
                         <select id="excelFontSize" onchange="updateExcelFontSize(this.value)">
                             <option value="10">10px</option>
                             <option value="11">11px</option>
@@ -2653,30 +2658,30 @@ function showExcelView() {
                     </div>
                     
                     <div class="config-group">
-                        <label><i class="fas fa-border-all"></i> Bordes:</label>
+                        <label><i class="fas fa-border-all"></i> <span data-i18n="bordes">Bordes:</span></label>
                         <select id="excelBorders" onchange="updateExcelBorders(this.value)">
-                            <option value="all" selected>Todos</option>
-                            <option value="none">Ninguno</option>
-                            <option value="minimal">Mínimo</option>
+                            <option value="all" selected data-i18n="todos">Todos</option>
+                            <option value="none" data-i18n="ninguno">Ninguno</option>
+                            <option value="minimal" data-i18n="minimo">Mínimo</option>
                         </select>
                     </div>
                     
                     <div class="config-group">
-                        <label><i class="fas fa-layer-group"></i> Hoja:</label>
+                        <label><i class="fas fa-layer-group"></i> <span data-i18n="hoja">Hoja:</span></label>
                         <select id="sheetDropdown" onchange="switchSheet(this.value)">
-                            <option value="">Seleccionar hoja...</option>
+                            <option value="" data-i18n="seleccionar_hoja">Seleccionar hoja...</option>
                         </select>
                     </div>
                     
                     <div class="config-group">
                         <button class="btn btn-success" id="saveExcelBtn" onclick="saveExcelChanges()" disabled>
-                            <i class="fas fa-save"></i> Guardar
+                            <i class="fas fa-save"></i> <span data-i18n="guardar">Guardar</span>
                         </button>
                     </div>
                     
                     <div class="config-group">
                         <button class="btn btn-primary" id="downloadExcelBtn" onclick="downloadExcelFile()" disabled>
-                            <i class="fas fa-download"></i> Descargar
+                            <i class="fas fa-download"></i> <span data-i18n="descargar">Descargar</span>
                         </button>
                     </div>
                 </div>
@@ -2688,8 +2693,8 @@ function showExcelView() {
             <!-- Mensaje cuando no hay Excel cargado -->
             <div id="excelPlaceholder" class="excel-placeholder">
                 <i class="fas fa-file-excel" style="font-size: 3rem; color: var(--light-text);"></i>
-                <p>Excel se actualiza automáticamente con cada análisis</p>
-                <small>Los datos se cargan al abrir esta vista</small>
+                <p data-i18n="excel_actualiza_automaticamente">Excel se actualiza automáticamente con cada análisis</p>
+                <small data-i18n="datos_cargan_al_abrir">Los datos se cargan al abrir esta vista</small>
             </div>
         </div>
     `;
@@ -2843,7 +2848,12 @@ async function loadSelectedExcel() {
         const data = await response.json();
         
         if (!data.success) {
-            showNotification('Error al cargar Excel: ' + data.error, 'error');
+            // Traducir mensaje de error si es una clave de traducción
+            let errorMessage = data.error;
+            if (typeof errorMessage === 'string' && !errorMessage.includes(' ') && translations[currentLang] && translations[currentLang][errorMessage]) {
+                errorMessage = t(errorMessage);
+            }
+            showNotification(t('error_cargar_excel') + ': ' + errorMessage, 'error');
             return;
         }
         
@@ -2884,7 +2894,7 @@ async function loadSelectedExcel() {
         
     } catch (error) {
         console.error('Error cargando Excel:', error);
-        showNotification('Error al cargar Excel', 'error');
+        showNotification(t('error_cargar_excel'), 'error');
     }
 }
 
@@ -2954,11 +2964,16 @@ async function loadSessionExcel() {
         const data = await response.json();
         
         if (!data.success) {
-            showNotification('Error al cargar Excel: ' + data.error, 'error');
+            // Traducir mensaje de error si es una clave de traducción
+            let errorMessage = data.error;
+            if (typeof errorMessage === 'string' && !errorMessage.includes(' ') && translations[currentLang] && translations[currentLang][errorMessage]) {
+                errorMessage = t(errorMessage);
+            }
+            showNotification(t('error_cargar_excel') + ': ' + errorMessage, 'error');
             document.getElementById('excelPlaceholder').innerHTML = `
                 <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: var(--danger-color);"></i>
-                <p>Error al cargar Excel</p>
-                <small>${data.error}</small>
+                <p data-i18n="error_cargar_excel">Error al cargar Excel</p>
+                <small>${errorMessage}</small>
             `;
             return;
         }
@@ -2999,7 +3014,7 @@ async function loadSessionExcel() {
             stack: error.stack,
             name: error.name
         });
-        showNotification('Error al cargar Excel de sesión: ' + error.message, 'error');
+        showNotification(t('error_cargar_excel_sesion') + ': ' + error.message, 'error');
         document.getElementById('excelPlaceholder').innerHTML = `
             <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: var(--danger-color);"></i>
             <p>Error de conexión</p>
@@ -3299,50 +3314,50 @@ function updateObjectsChart(objects) {
 
 // Vista: Logs del sistema
 function showLogsView() {
-    updateViewTitle('📄 Logs del Sistema');
+    updateViewTitle('📄 <span data-i18n="logs_sistema">Logs del Sistema</span>');
     
     const content = `
         <div class="logs-container">
             <div class="logs-header">
                 <h2>
-                    <i class="fas fa-file-alt"></i> Logs de Sesión
+                    <i class="fas fa-file-alt"></i> <span data-i18n="logs_sesion">Logs de Sesión</span>
                     <span class="session-badge" id="sessionBadge"></span>
                 </h2>
                 <div class="logs-controls">
                     <button class="btn btn-success" onclick="downloadLogs()">
-                        <i class="fas fa-download"></i> Descargar TXT
+                        <i class="fas fa-download"></i> <span data-i18n="descargar_txt">Descargar TXT</span>
                     </button>
                     <button class="btn btn-secondary" onclick="refreshLogs()">
-                        <i class="fas fa-sync-alt"></i> Actualizar
+                        <i class="fas fa-sync-alt"></i> <span data-i18n="actualizar">Actualizar</span>
                     </button>
                     <button class="btn btn-secondary" onclick="clearLogsDisplay()">
-                        <i class="fas fa-trash"></i> Limpiar Vista
+                        <i class="fas fa-trash"></i> <span data-i18n="limpiar_vista">Limpiar Vista</span>
                     </button>
                     <label class="auto-refresh-toggle">
                         <input type="checkbox" id="autoRefreshLogs" onchange="toggleAutoRefresh(this.checked)">
-                        <span>Auto-actualizar (5s)</span>
+                        <span data-i18n="auto_actualizar">Auto-actualizar (5s)</span>
                     </label>
                 </div>
             </div>
             
             <div class="logs-filters">
                 <button class="log-filter-btn active" data-level="all" onclick="filterLogs('all')">
-                    <i class="fas fa-list"></i> Todos
+                    <i class="fas fa-list"></i> <span data-i18n="todos">Todos</span>
                 </button>
                 <button class="log-filter-btn" data-level="INFO" onclick="filterLogs('INFO')">
-                    <i class="fas fa-info-circle"></i> Info
+                    <i class="fas fa-info-circle"></i> <span data-i18n="info">Info</span>
                 </button>
                 <button class="log-filter-btn" data-level="WARNING" onclick="filterLogs('WARNING')">
-                    <i class="fas fa-exclamation-triangle"></i> Advertencias
+                    <i class="fas fa-exclamation-triangle"></i> <span data-i18n="advertencias">Advertencias</span>
                 </button>
                 <button class="log-filter-btn" data-level="ERROR" onclick="filterLogs('ERROR')">
-                    <i class="fas fa-times-circle"></i> Errores
+                    <i class="fas fa-times-circle"></i> <span data-i18n="errores">Errores</span>
                 </button>
             </div>
             
             <div class="logs-content" id="logsContent">
                 <div class="loading-logs">
-                    <i class="fas fa-spinner fa-spin"></i> Cargando logs...
+                    <i class="fas fa-spinner fa-spin"></i> <span data-i18n="cargando_logs">Cargando logs...</span>
                 </div>
             </div>
         </div>
@@ -3367,7 +3382,7 @@ async function refreshLogs() {
             logsContent.innerHTML = `
                 <div class="error-message">
                     <i class="fas fa-exclamation-circle"></i>
-                    Error al cargar logs: ${data.error}
+                    <span data-i18n="error_cargar_logs">Error al cargar logs</span>: ${data.error}
                 </div>
             `;
             return;
@@ -3384,7 +3399,7 @@ async function refreshLogs() {
             logsContent.innerHTML = `
                 <div class="empty-logs">
                     <i class="fas fa-inbox"></i>
-                    <p>No hay logs disponibles en esta sesión</p>
+                    <p data-i18n="no_hay_logs">No hay logs disponibles en esta sesión</p>
                     <small>ID Sesión: ${data.session_id}</small>
                 </div>
             `;
@@ -3421,7 +3436,7 @@ async function refreshLogs() {
         logsContent.innerHTML = `
             <div class="error-message">
                 <i class="fas fa-exclamation-circle"></i>
-                Error de conexión: ${error.message}
+                <span data-i18n="error_conexion">Error de conexión</span>: ${error.message}
             </div>
         `;
     }
@@ -3531,40 +3546,40 @@ function downloadLogs() {
 }
 
 function showHelpView() {
-    updateViewTitle('❓ Ayuda');
+    updateViewTitle('❓ <span data-i18n="ayuda">Ayuda</span>');
     
     const content = `
         <div class="help-container">
             <div class="help-card">
-                <h2><i class="fas fa-question-circle"></i> Ayuda y Documentación</h2>
+                <h2><i class="fas fa-question-circle"></i> <span data-i18n="ayuda_documentacion">Ayuda y Documentación</span></h2>
                 
                 <div class="help-section">
-                    <h3>¿Cómo usar el sistema?</h3>
+                    <h3 data-i18n="como_usar_sistema">¿Cómo usar el sistema?</h3>
                     <ol>
-                        <li>Selecciona una carpeta con videos o videos individuales</li>
-                        <li>Opcionalmente configura el ROI de timestamp</li>
-                        <li>Espera a que el sistema analice los videos</li>
-                        <li>Revisa los clips generados en el historial</li>
+                        <li data-i18n="selecciona_carpeta_videos">Selecciona una carpeta con videos o videos individuales</li>
+                        <li data-i18n="configura_roi_timestamp">Opcionalmente configura el ROI de timestamp</li>
+                        <li data-i18n="espera_analisis">Espera a que el sistema analice los videos</li>
+                        <li data-i18n="revisa_clips_historial">Revisa los clips generados en el historial</li>
                     </ol>
                 </div>
                 
                 <div class="help-section">
-                    <h3>Formatos soportados</h3>
+                    <h3 data-i18n="formatos_soportados">Formatos soportados</h3>
                     <p>MP4, AVI, MOV, DAV, MKV</p>
                 </div>
                 
                 <div class="help-section">
-                    <h3>Contacto</h3>
+                    <h3 data-i18n="contacto">Contacto</h3>
                     <p>Grupo de Ingeniería de Medios<br>Escuela Politécnica</p>
-                    <p><strong>Email:</strong> <a href="mailto:natera@unex.es">natera@unex.es</a></p>
-                    <p><strong>Teléfono:</strong> +34 674 844 082</p>
+                    <p><strong data-i18n="email">Email:</strong> <a href="mailto:natera@unex.es">natera@unex.es</a></p>
+                    <p><strong data-i18n="telefono">Teléfono:</strong> +34 674 844 082</p>
                     <div class="help-section" style="margin-top: 15px;">
-                        <h4>Reportar Errores</h4>
-                        <p>Si encuentras algún problema, por favor incluye los logs del sistema en tu reporte:</p>
+                        <h4 data-i18n="reportar_errores">Reportar Errores</h4>
+                        <p data-i18n="incluye_logs_reporte">Si encuentras algún problema, por favor incluye los logs del sistema en tu reporte:</p>
                         <ol style="font-size: 0.9em;">
-                            <li>Ve a la sección "Logs del Sistema"</li>
-                            <li>Haz clic en "Descargar Logs"</li>
-                            <li>Adjunta el archivo descargado a tu email</li>
+                            <li data-i18n="ve_logs_sistema">Ve a la sección "Logs del Sistema"</li>
+                            <li data-i18n="haz_clic_descargar">Haz clic en "Descargar Logs"</li>
+                            <li data-i18n="adjunta_archivo_email">Adjunta el archivo descargado a tu email</li>
                         </ol>
                     </div>
                 </div>
@@ -4067,10 +4082,9 @@ function showROISelectionForProcessing(folderPath, uploadedFiles) {
     const content = `
         <div class="roi-processing-container">
             <div class="roi-processing-header">
-                <h2><i class="fas fa-crosshairs"></i> Selecciona el Área de Movimiento</h2>
-                <p class="roi-processing-description">
-                    Define la zona donde quieres detectar movimiento. 
-                    Solo se analizarán eventos dentro de esta área.
+                <h2><i class="fas fa-crosshairs"></i> <span data-i18n="selecciona_area_movimiento">${t('selecciona_area_movimiento')}</span></h2>
+                <p class="roi-processing-description" data-i18n="define_zona_movimiento">
+                    ${t('define_zona_movimiento')}
                 </p>
             </div>
             
@@ -4078,17 +4092,17 @@ function showROISelectionForProcessing(folderPath, uploadedFiles) {
                 <div class="step-indicator">
                     <div class="step active">
                         <div class="step-number">1</div>
-                        <div class="step-label">Cargando video...</div>
+                        <div class="step-label" data-i18n="cargando_video">${t('cargando_video')}</div>
                     </div>
                     <div class="step-line"></div>
                     <div class="step">
                         <div class="step-number">2</div>
-                        <div class="step-label">Definir ROI</div>
+                        <div class="step-label" data-i18n="definir_roi">${t('definir_roi')}</div>
                     </div>
                     <div class="step-line"></div>
                     <div class="step">
                         <div class="step-number">3</div>
-                        <div class="step-label">Procesar</div>
+                        <div class="step-label" data-i18n="procesar">${t('procesar')}</div>
                     </div>
                 </div>
             </div>
@@ -4100,20 +4114,20 @@ function showROISelectionForProcessing(folderPath, uploadedFiles) {
                         <!-- Loader mientras carga el video -->
                         <div class="video-loading" id="videoLoadingIndicator">
                             <div class="spinner"></div>
-                            <p id="loadingMessage">Cargando video...</p>
+                            <p id="loadingMessage" data-i18n="cargando_video">${t('cargando_video')}</p>
                             <small id="loadingSubtext" style="color: #999; margin-top: 10px;"></small>
                         </div>
                         <canvas id="roiProcessingCanvas" width="1000" height="600" style="display:none;"></canvas>
                         <div class="canvas-instructions" id="canvasInstructions" style="display:none;">
                             <i class="fas fa-mouse-pointer"></i>
-                            <span>Arrastra con el mouse para dibujar el área de análisis</span>
+                            <span data-i18n="arrastra_dibujar_area">${t('arrastra_dibujar_area')}</span>
                         </div>
                     </div>
                     
                     <div class="video-controls" style="margin-top: 15px; display: none;" id="videoControlsProcessing">
                         <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
                             <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">
-                                <i class="fas fa-film"></i> Frame:
+                                <i class="fas fa-film"></i> <span data-i18n="frame">${t('frame')}</span>
                             </span>
                             <input type="range" id="videoProcessingSeekBar" min="0" max="100" value="0" 
                                    style="flex: 1;" oninput="seekProcessingVideoFrame(this.value)">
@@ -4125,7 +4139,7 @@ function showROISelectionForProcessing(folderPath, uploadedFiles) {
                 <!-- Coordenadas y acciones -->
                 <div class="roi-processing-sidebar" id="roiProcessingSidebar" style="opacity: 0.5; pointer-events: none;">
                     <div class="roi-coords-card">
-                        <h3><i class="fas fa-ruler-combined"></i> Coordenadas del Área</h3>
+                        <h3><i class="fas fa-ruler-combined"></i> <span data-i18n="coordenadas_area">${t('coordenadas_area')}</span></h3>
                         <div class="roi-coords-grid">
                             <div class="coord-input">
                                 <label>X:</label>
@@ -4136,38 +4150,38 @@ function showROISelectionForProcessing(folderPath, uploadedFiles) {
                                 <input type="number" id="roiProcessingY" value="0" min="0" oninput="updateProcessingROIPreview()">
                             </div>
                             <div class="coord-input">
-                                <label>Ancho:</label>
+                                <label data-i18n="ancho">${t('ancho')}</label>
                                 <input type="number" id="roiProcessingW" value="640" min="1" oninput="updateProcessingROIPreview()">
                             </div>
                             <div class="coord-input">
-                                <label>Alto:</label>
+                                <label data-i18n="alto">${t('alto')}</label>
                                 <input type="number" id="roiProcessingH" value="480" min="1" oninput="updateProcessingROIPreview()">
                             </div>
                         </div>
                         
                         <button class="btn btn-secondary btn-block" onclick="resetProcessingROI()">
-                            <i class="fas fa-undo"></i> Usar Video Completo
+                            <i class="fas fa-undo"></i> <span data-i18n="usar_video_completo">${t('usar_video_completo')}</span>
                         </button>
                     </div>
                     
                     <div class="roi-options-card">
-                        <h3><i class="fas fa-sliders-h"></i> Opciones de Análisis</h3>
+                        <h3><i class="fas fa-sliders-h"></i> <span data-i18n="opciones_analisis">${t('opciones_analisis')}</span></h3>
                         <div class="option-item">
                             <input type="checkbox" id="processingGenerateClips" checked>
-                            <label for="processingGenerateClips">Generar clips de video</label>
+                            <label for="processingGenerateClips" data-i18n="generar_clips">${t('generar_clips')}</label>
                         </div>
                         <div class="option-item">
                             <input type="checkbox" id="processingUseAI" checked>
-                            <label for="processingUseAI">Análisis con IA</label>
+                            <label for="processingUseAI" data-i18n="analisis_ia">${t('analisis_ia')}</label>
                         </div>
                     </div>
                     
                     <div class="roi-processing-actions">
                         <button class="btn btn-primary btn-block btn-large" onclick="confirmAndStartProcessing()">
-                            <i class="fas fa-play-circle"></i> Iniciar Análisis
+                            <i class="fas fa-play-circle"></i> <span data-i18n="iniciar_analisis">${t('iniciar_analisis')}</span>
                         </button>
                         <button class="btn btn-secondary btn-block" onclick="cancelROIProcessing()">
-                            <i class="fas fa-times"></i> Cancelar
+                            <i class="fas fa-times"></i> <span data-i18n="cancelar">${t('cancelar')}</span>
                         </button>
                     </div>
                 </div>
